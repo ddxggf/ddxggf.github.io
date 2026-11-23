@@ -137,12 +137,17 @@ pcall(function()
 end)
 
 -- ===== 侧边栏 =====
-local sidebar = Instance.new("Frame")
+local sidebar = Instance.new("ScrollingFrame")
 sidebar.Position = UDim2.fromOffset(1, 42)
 sidebar.Size = UDim2.new(0, 128, 1, -43)
 sidebar.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 sidebar.BorderSizePixel = 0
 sidebar.Active = true
+sidebar.ScrollBarThickness = 4
+sidebar.ScrollBarImageColor3 = Color3.fromRGB(90, 90, 90)
+sidebar.ScrollingDirection = Enum.ScrollingDirection.Y
+sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
+pcall(function() sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
 sidebar.Parent = win
 corner(sidebar, 10)
 
@@ -187,6 +192,17 @@ page4.BackgroundTransparency = 1
 page4.Visible = false
 page4.Parent = pages
 
+-- 备用空页（5~10），以后往里加功能
+local emptyPages = {}
+for _ = 5, 10 do
+    local p = Instance.new("Frame")
+    p.Size = UDim2.fromScale(1, 1)
+    p.BackgroundTransparency = 1
+    p.Visible = false
+    p.Parent = pages
+    emptyPages[#emptyPages + 1] = p
+end
+
 -- ===== 状态回显（放在 pages 上，三页共用） =====
 local status = Instance.new("TextLabel")
 status.Size = UDim2.new(1, -28, 0, 18)
@@ -212,6 +228,9 @@ end
 
 -- ===== 侧边栏按钮 =====
 local pagesList = { page1, page2, page3, page4 }
+for _, p in ipairs(emptyPages) do
+    pagesList[#pagesList + 1] = p
+end
 local buttons = {}
 
 local cancelPick = nil
@@ -254,7 +273,11 @@ end
 makeCategory("修改角色属性", 1, 1)
 makeCategory("方块无碰撞", 2, 2)
 makeCategory("方块尺寸", 3, 3)
-makeCategory("空", 4, 4)
+makeCategory("空4", 4, 4)
+makeCategory("高亮 ESP", 5, 5)
+for i = 6, 10 do
+    makeCategory("空" .. i, i, i)
+end
 
 -- ===== 输入行 =====
 local function makeInputRow(parent, y, placeholder, onSubmit, defaultText)
@@ -559,7 +582,7 @@ end, tostring(FLY_SPEED))
 
 -- ===== 穿墙：只关人物碰撞，不做任何贴地 =====
 local noclipOn = false
-local flying = false        -- 飞行中要恢复碰撞，所以穿墙循环要先看这个
+local flying = false        -- 飞行时也穿墙（每帧关碰撞）
 local charCollide = {}    -- 被我关掉碰撞的人物部件
 local loopConn = nil
 local noclipToggle = nil
@@ -569,7 +592,7 @@ local setNoclip = nil       -- 先占位，step 里要用
 
 -- 每帧（物理步进之前）把自己角色的部件碰撞关掉
 local function disableCharCollision()
-    if flying then return end   -- 飞行时不吃穿墙
+    -- 飞行时也照关，飞行=穿墙
     local char = player.Character
     if not char then return end
     for _, p in ipairs(char:GetDescendants()) do
@@ -753,6 +776,9 @@ local function flyStep()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not root then return end
 
+    -- 飞行时照样穿墙：每帧把碰撞关掉
+    disableCharCollision()
+
     -- 关掉 Humanoid 的自动转向，否则它会按摇杆方向拧人
     if hum then hum.AutoRotate = false end
     if hum and hum:FindFirstChildOfClass("Animator") then freezeBody(hum) end
@@ -809,19 +835,7 @@ local function flyStep()
     local vx = dir.X * FLY_SPEED
     local vz = dir.Z * FLY_SPEED
 
-    -- 撞墙就停：探 2.2 格，撞到就停 0.15 秒再重新判，避免每帧在“动/停”之间抖
-    local now = os.clock()
-    if now >= flyBlockUntil and (vx ~= 0 or vz ~= 0) and flyRay then
-        flyRay.FilterDescendantsInstances = { player.Character }
-        local probe = Vector3.new(vx, 0, vz).Unit * FLY_PROBE
-        local hit = workspace:Raycast(root.Position, probe, flyRay)
-        if hit then
-            flyBlockUntil = now + 0.15
-        end
-    end
-    if now < flyBlockUntil then
-        vx, vz = 0, 0
-    end
+    -- 不再探墙、不再停：飞行时墙随便穿
 
     -- 转向：目标直接取相机的完整朝向（含俯仰），所以抬头镜头人也会仰起来
     if flyAO and cam then
@@ -839,8 +853,8 @@ end
 setFly = function(on)
     if on then
         flying = true
-        -- 飞行不吃穿墙：碰撞恢复回来，撞墙才停得住
-        restoreCharCollision()
+        -- 飞行也能穿墙：碰撞继续关着
+        disableCharCollision()
         local char = player.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         flyBaseY = root and root.Position.Y or nil
@@ -866,7 +880,11 @@ setFly = function(on)
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum then hum.AutoRotate = true end
         thawBody(hum)
-        if noclipOn then disableCharCollision() end
+        if noclipOn then
+            disableCharCollision()
+        else
+            restoreCharCollision()
+        end
         say("飞行已关闭", nil)
     end
 end
@@ -902,7 +920,7 @@ end
 -- ===== 第 2 页：点方块 → 变无碰撞，并列进列表 =====
 local marked = {}        -- part -> 这一行的 Frame
 local markedCount = 0
-local viewMode = "box"   -- box 高亮 / line 连线
+local viewMode = "box"   -- box / line 连线
 local viewObj = nil
 
 local function clearView()
@@ -1152,6 +1170,175 @@ end
 
 -- ===== 第 4 页：空 =====
 
+-- ===== 第 5 页：高亮 ESP（高亮 + 名字 + 血量 + 距离）=====
+local espPage = emptyPages[1]
+
+local espOn = false
+local espTracks = {}
+local espLast = 0
+local espToggle = nil
+local espStat = nil
+local espUpdate = nil
+
+local function espClear()
+    for char, rec in pairs(espTracks) do
+        if rec.highlight then
+            pcall(function() rec.highlight:Destroy() end)
+        end
+        if rec.billboard then
+            pcall(function() rec.billboard:Destroy() end)
+        end
+    end
+    espTracks = {}
+end
+
+local function espAdd(char, head, hum)
+    local hl = Instance.new("Highlight")
+    hl.Name = "ESP_Highlight"
+    hl.FillColor = Color3.fromRGB(0, 170, 255)
+    hl.FillTransparency = 0.45
+    hl.OutlineColor = Color3.fromRGB(0, 225, 255)
+    hl.OutlineTransparency = 0
+    pcall(function() hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop end)
+    hl.Parent = char
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "ESP_Tag"
+    bb.Size = UDim2.fromOffset(180, 56)
+    bb.StudsOffset = Vector3.new(0, 2.6, 0)
+    bb.AlwaysOnTop = true
+    bb.LightInfluence = 0
+    bb.MaxDistance = 600
+    bb.Adornee = head
+    bb.Parent = head
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundTransparency = 1
+    label.Text = ""
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 12
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextStrokeTransparency = 0.3
+    label.TextWrapped = true
+    label.TextXAlignment = Enum.TextXAlignment.Center
+    label.TextYAlignment = Enum.TextYAlignment.Center
+    label.Parent = bb
+
+    espTracks[char] = { highlight = hl, billboard = bb, label = label }
+end
+
+espUpdate = function()
+    local myChar = player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local myPos = myRoot and myRoot.Position or Vector3.new(0, 0, 0)
+
+    -- 清掉已经没了的角色
+    for char, rec in pairs(espTracks) do
+        if not char.Parent or not char:FindFirstChildOfClass("Humanoid") then
+            if rec.highlight then pcall(function() rec.highlight:Destroy() end) end
+            if rec.billboard then pcall(function() rec.billboard:Destroy() end) end
+            espTracks[char] = nil
+        end
+    end
+
+    -- 新增角色（顶层模型 + 所有玩家角色）
+    local seen = {}
+    local function consider(m)
+        if seen[m] then return end
+        seen[m] = true
+        if espTracks[m] then return end
+        local hum = m:FindFirstChildOfClass("Humanoid")
+        local head = m:FindFirstChild("Head")
+        if hum and head then
+            espAdd(m, head, hum)
+        end
+    end
+
+    for _, c in ipairs(workspace:GetChildren()) do
+        if c:IsA("Model") and c:FindFirstChildOfClass("Humanoid") then
+            consider(c)
+        end
+    end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character then
+            consider(plr.Character)
+        end
+    end
+
+    -- 刷新文字：名字 / 血量 / 距离 studs
+    local counted = 0
+    for char, rec in pairs(espTracks) do
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+        if hum and rec.label and root then
+            counted = counted + 1
+            local nm = hum.DisplayName
+            if not nm or nm == "" then nm = char.Name end
+            local hp = math.max(0, math.floor(hum.Health))
+            local maxhp = math.max(1, math.floor(hum.MaxHealth))
+            local dist = math.floor((root.Position - myPos).Magnitude)
+            rec.label.Text = nm .. "\n" .. hp .. "/" .. maxhp .. "\n" .. dist .. " studs"
+
+            local ratio = hp / maxhp
+            if ratio > 0.6 then
+                rec.label.TextColor3 = Color3.fromRGB(120, 240, 150)
+            elseif ratio > 0.3 then
+                rec.label.TextColor3 = Color3.fromRGB(255, 220, 110)
+            else
+                rec.label.TextColor3 = Color3.fromRGB(255, 110, 110)
+            end
+        end
+    end
+
+    if espStat then
+        espStat.Text = "已标记 " .. counted .. " 个角色"
+    end
+end
+
+espToggle = makeToggle(espPage, 12, "高亮 ESP", function(state)
+    espOn = state
+    if espOn then
+        if espUpdate then espUpdate() end
+    else
+        espClear()
+        if espStat then espStat.Text = "已关闭" end
+    end
+end)
+
+espStat = Instance.new("TextLabel")
+espStat.Position = UDim2.fromOffset(14, 68)
+espStat.Size = UDim2.new(1, -28, 0, 18)
+espStat.BackgroundTransparency = 1
+espStat.Text = "已关闭"
+espStat.Font = Enum.Font.SourceSans
+espStat.TextSize = 11
+espStat.TextColor3 = Color3.fromRGB(140, 140, 140)
+espStat.TextXAlignment = Enum.TextXAlignment.Left
+espStat.Parent = espPage
+
+local espHint = Instance.new("TextLabel")
+espHint.Position = UDim2.fromOffset(14, 92)
+espHint.Size = UDim2.new(1, -28, 0, 46)
+espHint.BackgroundTransparency = 1
+espHint.Text = "高亮所有人形模型，头顶显示名字、血量、离你多少 studs。每 0.25 秒刷新一次；死亡、退出、重生的角色会自动处理。"
+espHint.Font = Enum.Font.SourceSans
+espHint.TextSize = 10
+espHint.TextColor3 = Color3.fromRGB(120, 120, 120)
+espHint.TextWrapped = true
+espHint.TextXAlignment = Enum.TextXAlignment.Left
+espHint.TextYAlignment = Enum.TextYAlignment.Top
+espHint.Parent = espPage
+
+RunService.Heartbeat:Connect(function()
+    if not espOn then return end
+    local now = os.clock()
+    if now - espLast < 0.25 then return end
+    espLast = now
+    if espUpdate then espUpdate() end
+end)
+
+
 setPicking = function(mode, quiet)
     picking = mode
     if pickBtn then
@@ -1321,5 +1508,6 @@ Cleanup.run = function()
         if setPicking then setPicking(nil, true) end
     end)
     pcall(function() clearView() end)
+    pcall(function() espOn = false; espClear() end)
     FLY_SPEED = 40
 end
