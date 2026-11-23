@@ -152,7 +152,7 @@ sidePad.PaddingRight = UDim.new(0, 8)
 sidePad.PaddingTop = UDim.new(0, 8)
 
 local sideList = Instance.new("UIListLayout", sidebar)
-sideList.Padding = UDim.new(0, 4)
+sideList.Padding = UDim.new(0, 6)
 sideList.SortOrder = Enum.SortOrder.LayoutOrder
 
 -- ===== 页面容器 =====
@@ -187,17 +187,6 @@ page4.BackgroundTransparency = 1
 page4.Visible = false
 page4.Parent = pages
 
--- 备用空页（5~10），以后往里加功能
-local emptyPages = {}
-for _ = 5, 10 do
-    local p = Instance.new("Frame")
-    p.Size = UDim2.fromScale(1, 1)
-    p.BackgroundTransparency = 1
-    p.Visible = false
-    p.Parent = pages
-    emptyPages[#emptyPages + 1] = p
-end
-
 -- ===== 状态回显（放在 pages 上，三页共用） =====
 local status = Instance.new("TextLabel")
 status.Size = UDim2.new(1, -28, 0, 18)
@@ -223,9 +212,6 @@ end
 
 -- ===== 侧边栏按钮 =====
 local pagesList = { page1, page2, page3, page4 }
-for _, p in ipairs(emptyPages) do
-    pagesList[#pagesList + 1] = p
-end
 local buttons = {}
 
 local cancelPick = nil
@@ -246,14 +232,14 @@ end
 
 local function makeCategory(name, order, pageIndex)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 24)
+    btn.Size = UDim2.new(1, 0, 0, 34)
     btn.LayoutOrder = order
     btn.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
     btn.BorderSizePixel = 0
     btn.AutoButtonColor = false
     btn.Text = name
     btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 11
+    btn.TextSize = 12
     btn.TextColor3 = Color3.fromRGB(150, 150, 150)
     btn.TextXAlignment = Enum.TextXAlignment.Left
     btn.TextTruncate = Enum.TextTruncate.AtEnd
@@ -268,10 +254,7 @@ end
 makeCategory("修改角色属性", 1, 1)
 makeCategory("方块无碰撞", 2, 2)
 makeCategory("方块尺寸", 3, 3)
-makeCategory("空4", 4, 4)
-for i = 5, 10 do
-    makeCategory("空" .. i, i, i)
-end
+makeCategory("空", 4, 4)
 
 -- ===== 输入行 =====
 local function makeInputRow(parent, y, placeholder, onSubmit, defaultText)
