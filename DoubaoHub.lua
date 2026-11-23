@@ -1002,4 +1002,341 @@ viewToggle.TextColor3 = Color3.fromRGB(215, 215, 215)
 viewToggle.Parent = page2
 corner(viewToggle, 6)
 
-local restoreBtn = Instance.new("Tex
+local restoreBtn = Instance.new("TextButton")
+restoreBtn.Position = UDim2.new(1, -160, 0, 52)
+restoreBtn.Size = UDim2.fromOffset(146, 28)
+restoreBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+restoreBtn.BorderSizePixel = 0
+restoreBtn.AutoButtonColor = false
+restoreBtn.Text = "全部恢复"
+restoreBtn.Font = Enum.Font.SourceSansBold
+restoreBtn.TextSize = 11
+restoreBtn.TextColor3 = Color3.fromRGB(215, 215, 215)
+restoreBtn.Parent = page2
+corner(restoreBtn, 6)
+
+local listBox = Instance.new("ScrollingFrame")
+listBox.Position = UDim2.fromOffset(14, 92)
+listBox.Size = UDim2.new(1, -28, 1, -122)
+listBox.BackgroundColor3 = Color3.fromRGB(13, 13, 13)
+listBox.BorderSizePixel = 0
+listBox.ScrollBarThickness = 4
+listBox.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 60)
+listBox.CanvasSize = UDim2.new(0, 0, 0, 0)
+listBox.AutomaticCanvasSize = Enum.AutomaticSize.Y
+listBox.ScrollingDirection = Enum.ScrollingDirection.Y
+listBox.Parent = page2
+corner(listBox, 6)
+
+local listLayout = Instance.new("UIListLayout", listBox)
+listLayout.Padding = UDim.new(0, 4)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+local listPad = Instance.new("UIPadding", listBox)
+listPad.PaddingLeft = UDim.new(0, 4)
+listPad.PaddingRight = UDim.new(0, 4)
+listPad.PaddingTop = UDim.new(0, 4)
+
+local function addRow(part)
+    markedCount = markedCount + 1
+    local index = markedCount
+
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 30)
+    row.LayoutOrder = index
+    row.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+    row.BorderSizePixel = 0
+    row.Parent = listBox
+
+    local name = Instance.new("TextLabel")
+    name.Size = UDim2.new(1, -66, 1, 0)
+    name.Position = UDim2.fromOffset(8, 0)
+    name.BackgroundTransparency = 1
+    name.Text = string.format("#%d  %s  %.1f×%.1f×%.1f", index, part.Name, part.Size.X, part.Size.Y, part.Size.Z)
+    name.Font = Enum.Font.SourceSans
+    name.TextSize = 10
+    name.TextColor3 = Color3.fromRGB(200, 200, 200)
+    name.TextXAlignment = Enum.TextXAlignment.Left
+    name.TextTruncate = Enum.TextTruncate.AtEnd
+    name.Parent = row
+
+    local view = Instance.new("TextButton")
+    view.Size = UDim2.fromOffset(50, 22)
+    view.Position = UDim2.new(1, -54, 0.5, -11)
+    view.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
+    view.BorderSizePixel = 0
+    view.AutoButtonColor = false
+    view.Text = "查看"
+    view.Font = Enum.Font.SourceSansBold
+    view.TextSize = 10
+    view.TextColor3 = Color3.fromRGB(210, 210, 210)
+    view.Parent = row
+    corner(view, 4)
+
+    view.MouseButton1Click:Connect(function()
+        if part.Parent then
+            viewPart(part)
+            say("已定位 #" .. index .. "，看屏幕上高亮的地方", true)
+        else
+            say("这块已经被删掉了", false)
+        end
+    end)
+
+    marked[part] = row
+end
+
+local function markPart(part)
+    if marked[part] then
+        say("这块已经在列表里了", nil)
+        return
+    end
+    if not part.CanCollide then
+        say("这块本来就是无碰撞的", nil)
+        return
+    end
+    part.CanCollide = false
+    addRow(part)
+    say("已加入列表，现在是第 " .. markedCount .. " 块", true)
+end
+
+viewToggle.MouseButton1Click:Connect(function()
+    if viewMode == "box" then
+        viewMode = "line"
+        viewToggle.Text = "查看方式：连线"
+    else
+        viewMode = "box"
+        viewToggle.Text = "查看方式：高亮"
+    end
+end)
+
+restoreBtn.MouseButton1Click:Connect(function()
+    local n = 0
+    for part, row in pairs(marked) do
+        if part.Parent then
+            part.CanCollide = true
+            n = n + 1
+        end
+        if row then row:Destroy() end
+    end
+    marked = {}
+    markedCount = 0
+    clearView()
+    say("已恢复 " .. n .. " 块", nil)
+end)
+
+-- ===== 第 3 页：点方块读长宽高 =====
+local lastSizePart = nil
+
+local sizeInfo = Instance.new("TextLabel")
+sizeInfo.Position = UDim2.fromOffset(14, 54)
+sizeInfo.Size = UDim2.new(1, -28, 1, -80)
+sizeInfo.BackgroundColor3 = Color3.fromRGB(13, 13, 13)
+sizeInfo.BorderSizePixel = 0
+sizeInfo.Text = "还没选方块。\n点上面的按钮，然后去窗口外面点一块方块。"
+sizeInfo.Font = Enum.Font.SourceSans
+sizeInfo.TextSize = 12
+sizeInfo.TextColor3 = Color3.fromRGB(190, 190, 190)
+sizeInfo.TextWrapped = true
+sizeInfo.TextXAlignment = Enum.TextXAlignment.Left
+sizeInfo.TextYAlignment = Enum.TextYAlignment.Top
+sizeInfo.Parent = page3
+corner(sizeInfo, 6)
+local infoPad = Instance.new("UIPadding", sizeInfo)
+infoPad.PaddingLeft = UDim.new(0, 10)
+infoPad.PaddingTop = UDim.new(0, 8)
+
+sizeBtn = Instance.new("TextButton")
+sizeBtn.Position = UDim2.fromOffset(14, 8)
+sizeBtn.Size = UDim2.new(1, -28, 0, 36)
+sizeBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+sizeBtn.BorderSizePixel = 0
+sizeBtn.AutoButtonColor = false
+sizeBtn.Text = "点我选一块方块（读长宽高）"
+sizeBtn.Font = Enum.Font.SourceSansBold
+sizeBtn.TextSize = 12
+sizeBtn.TextColor3 = Color3.fromRGB(225, 225, 225)
+sizeBtn.Parent = page3
+corner(sizeBtn, 6)
+
+local function showSize(part)
+    lastSizePart = part
+    local s = part.Size
+    sizeInfo.Text = string.format(
+        "名称：%s\n\n长（X）：%.2f\n宽（Z）：%.2f\n高（Y）：%.2f",
+        part.Name, s.X, s.Z, s.Y
+    )
+    say("读到了：" .. part.Name, true)
+end
+
+-- ===== 第 4 页：空 =====
+
+setPicking = function(mode, quiet)
+    picking = mode
+    if pickBtn then
+        pickBtn.Text = (mode == "mark") and "点窗口外任意方块（点这里取消）" or "点我开始选方块（变无碰撞）"
+    end
+    if sizeBtn then
+        sizeBtn.Text = (mode == "size") and "点窗口外任意方块（点这里取消）" or "点我选一块方块（读长宽高）"
+    end
+    if not quiet then
+        if mode then
+            say("去窗口外面点一下你想选的那块方块", true)
+        else
+            say("已取消选择", nil)
+        end
+    end
+end
+
+pickBtn.MouseButton1Click:Connect(function()
+    if picking == "mark" then
+        setPicking(nil)
+    else
+        setPicking("mark")
+    end
+end)
+
+cancelPick = function()
+    if picking then setPicking(nil, true) end
+end
+
+sizeBtn.MouseButton1Click:Connect(function()
+    if picking == "size" then
+        setPicking(nil)
+    else
+        setPicking("size")
+    end
+end)
+
+UIS.InputBegan:Connect(function(input)
+    if not picking then return end
+    local t = input.UserInputType
+    if t ~= Enum.UserInputType.MouseButton1 and t ~= Enum.UserInputType.Touch then return end
+
+    local pos = input.Position
+    if inWin(pos) then return end   -- 点在窗口自己身上，交给窗口里的按钮
+
+    local part = partAt(pos)
+    if not part then
+        say("这里没点到方块，换个位置再点", false)
+        return
+    end
+
+    if picking == "mark" then
+        markPart(part)
+    else
+        showSize(part)
+    end
+    setPicking(nil, true)
+end)
+setPage(1)
+
+-- ===== 拖动：标题栏按下即跟手，全屏跟随，按位移增量累加 =====
+local dragging = false
+local dragInput = nil
+local dragTouch = nil
+local lastPos = nil
+local DRAG_MAX_DELTA = 150   -- 单帧异常跳变忽略
+
+-- 把位置统一成纯 Offset：Scale 参与累加会漂
+local function normalizePos()
+    local ap = win.AbsolutePosition
+    local as = win.AbsoluteSize
+    win.Position = UDim2.fromOffset(
+        ap.X + as.X * win.AnchorPoint.X,
+        ap.Y + as.Y * win.AnchorPoint.Y
+    )
+end
+
+local function beginDrag(input)
+    if dragging then return end
+    dragging = true
+    dragInput = input
+    dragTouch = (input.UserInputType == Enum.UserInputType.Touch) and input or nil
+    lastPos = input.Position
+    normalizePos()
+end
+
+local function endDrag()
+    dragging = false
+    dragInput = nil
+    dragTouch = nil
+    lastPos = nil
+end
+
+local function moveDrag(dx, dy)
+    local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+    local as = win.AbsoluteSize
+    local ax, ay = win.AnchorPoint.X, win.AnchorPoint.Y
+    local x = math.clamp(win.Position.X.Offset + dx, as.X * ax, math.max(as.X * ax, vp.X - as.X * (1 - ax)))
+    local y = math.clamp(win.Position.Y.Offset + dy, as.Y * ay, math.max(as.Y * ay, vp.Y - as.Y * (1 - ay)))
+    win.Position = UDim2.fromOffset(x, y)
+end
+
+titleBar.InputBegan:Connect(function(input)
+    local t = input.UserInputType
+    if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
+        beginDrag(input)
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if not dragging then return end
+
+    local t = input.UserInputType
+    if t == Enum.UserInputType.Touch then
+        if input ~= dragTouch then return end
+    elseif t == Enum.UserInputType.MouseMovement then
+        if not dragInput or dragInput.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+    else
+        return
+    end
+
+    local d = input.Delta
+    if d.Magnitude <= 0 then
+        if not lastPos then return end
+        d = input.Position - lastPos
+    end
+    lastPos = input.Position
+    if d.Magnitude <= 0 or d.Magnitude > DRAG_MAX_DELTA then return end
+
+    moveDrag(d.X, d.Y)
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if not dragging then return end
+    local t = input.UserInputType
+    if t == Enum.UserInputType.MouseButton1 then
+        endDrag()
+    elseif t == Enum.UserInputType.Touch and input == dragTouch then
+        endDrag()
+    end
+end)
+
+-- ===== 关窗口：穿墙、飞行、速度、跳跃力、点选全部复位 =====
+Cleanup.run = function()
+    if Cleanup.done then return end
+    Cleanup.done = true
+
+    pcall(function()
+        if flying and setFly then setFly(false) end
+    end)
+    pcall(function()
+        if noclipOn and setNoclip then setNoclip(false) end
+    end)
+    pcall(function()
+        local hum = getHumanoid()
+        if hum then
+            if origSpeed ~= nil then hum.WalkSpeed = origSpeed end
+            if origJump ~= nil then
+                hum.JumpPower = origJump
+                if origUseJumpPower ~= nil then
+                    hum.UseJumpPower = origUseJumpPower
+                end
+            end
+        end
+    end)
+    pcall(function()
+        if setPicking then setPicking(nil, true) end
+    end)
+    pcall(function() clearView() end)
+    FLY_SPEED = 40
+end
