@@ -1118,71 +1118,125 @@ end)
 -- ===== 踏空行走：只补垂直速度，不碰位置、不碰朝向，所以不会打转 =====
 local walkAirOn = false
 local walkAirConn = nil
-local walkJumpConn = nil
-local walkLockY = nil     -- 锁定的高度：只许往上抬，不许往下掉
+local walkPad = nil       -- 脚底那块透明实心板
+local walkPadY = nil      -- 板的固定高度：只跟 X/Z，Y 钉死不动
+
+local function removeWalkPad()
+    if walkPad then
+        pcall(function() walkPad:Destroy() end)
+        walkPad = nil
+    end
+    -- 保险：把场景里所有残留的板都清掉
+    for _, o in ipairs(workspace:GetChildren()) do
+        if o.Name == "WalkAirPad" then
+            pcall(function() o:Destroy() end)
+        end
+    end
+    walkPadY = nil
+end
+
+local function footYOf(char)
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    local hip = (hum and hum.HipHeight) or 2
+    return root.Position.Y - (root.Size.Y * 0.5 + hip)
+end
+
+local function createWalkPad(y)
+    removeWalkPad()
+    local pad = Instance.new("Part")
+    pad.Name = "WalkAirPad"
+    pad.Size = Vector3.new(5, 2, 5)
+    pad.Anchored = true
+    pad.CanCollide = true
+    pad.CanTouch = false
+    pad.CanQuery = false
+    pad.Transparency = 1
+    pad.Material = Enum.Material.SmoothPlastic
+    pad.TopSurface = Enum.SurfaceType.Smooth
+    pad.BottomSurface = Enum.SurfaceType.Smooth
+    pad.Parent = workspace
+    walkPad = pad
+    walkPadY = y
+end
 
 setWalkAir = function(on, quiet)
     if walkAirConn then walkAirConn:Disconnect(); walkAirConn = nil end
-    if walkJumpConn then walkJumpConn:Disconnect(); walkJumpConn = nil end
     walkAirOn = on and true or false
+    removeWalkPad()
 
     if walkAirOn then
         if flying and setFly then setFly(false) end   -- 飞行先关，不然两边抢高度
-        local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        walkLockY = root and root.Position.Y or nil
 
-        walkAirConn = RunService.Heartbeat:Connect(function()
+        local char = player.Character
+        local fy = footYOf(char)
+        if fy then
+            createWalkPad(fy - 1.2)
+        end
+
+        local walkBelow = 0
+        walkAirConn = RunService.Heartbeat:Connect(function(dt)
             if flying or not walkAirOn then return end
             local c = player.Character
             local r = c and c:FindFirstChild("HumanoidRootPart")
             if not r then return end
 
-            local v = r.AssemblyLinearVelocity
-            local y = walkLockY or r.Position.Y
+            -- 板没了（重生等）就按当前脚底重建一块
+            if not walkPad or not walkPad.Parent then
+                local fy2 = footYOf(c)
+                if not fy2 then return end
+                createWalkPad(fy2 - 1.2)
+            end
 
-            -- 往上跳 / 被抛起来就跟着抬，往下不给降
-            if v.Y > 2 and r.Position.Y > y then y = r.Position.Y end
-            -- 被外力推得太远就重置，防止越堆越高
-            if math.abs(y - r.Position.Y) > 12 then y = r.Position.Y end
-            walkLockY = y
-
-            -- 正在往上走就别插手，让跳跃自然完成
-            if v.Y > 2 then return end
-
-            -- 只改垂直速度：离目标越远补得越快，正好抵消每帧被重力吃掉的那点
-            local dy = y - r.Position.Y
-            local vy = math.clamp(dy * 12, -45, 45)
-            r.AssemblyLinearVelocity = Vector3.new(v.X, vy, v.Z)
-        end)
-
-        -- 空中也能跳：直接监听跳跃输入，只有悬空时才自己补一下
-        if UIS.JumpRequest then
-            walkJumpConn = UIS.JumpRequest:Connect(function()
-                if not walkAirOn or flying then return end
-                local c = player.Character
-                local r = c and c:FindFirstChild("HumanoidRootPart")
-                local h = c and c:FindFirstChildOfClass("Humanoid")
-                if not r then return end
-
-                local st = h and h:GetState()
-                if st == Enum.HumanoidStateType.Freefall
-                or st == Enum.HumanoidStateType.FallingDown
-                or st == Enum.HumanoidStateType.Jumping then
-                    local v = r.AssemblyLinearVelocity
-                    r.AssemblyLinearVelocity = Vector3.new(v.X, 45, v.Z)
-                    if h then pcall(function() h:ChangeState(Enum.HumanoidStateType.Jumping) end) end
+            -- 直接拿"脚底在哪"来定板，不用加速度判断
+            local fy = footYOf(c)
+            if fy and walkPadY then
+                local target = fy - 1.2
+                if target > walkPadY + 0.1 then
+                    -- 脚到了更高的一层（跳上去 / 走上高处）：板直接定在这一层
+                    walkPadY = target
+                    walkBelow = 0
+                elseif target < walkPadY - 1 then
+                    -- 人比板低一大截：只有真的站稳在更低的地面才降，掉下来途中不跟
+                    local hum = c:FindFirstChildOfClass("Humanoid")
+                    local st = hum and hum:GetState()
+                    if st == Enum.HumanoidStateType.Landed or st == Enum.HumanoidStateType.Running then
+                        walkBelow = walkBelow + (dt or 0)
+                        if walkBelow > 0.3 then
+                            walkPadY = target
+                            walkBelow = 0
+                        end
+                    else
+                        walkBelow = 0
+                    end
+                else
+                    walkBelow = 0
                 end
-            end)
-        end
+            end
+
+            -- X/Z 每一帧跟人，Y 按上面算好的那一层
+            walkPad.Position = Vector3.new(r.Position.X, walkPadY, r.Position.Z)
+            -- 碰撞常开：人在板下方才关，免得撞头
+            walkPad.CanCollide = (r.Position.Y >= walkPadY)
+        end)
     end
 
     if walkAirToggle then walkAirToggle.Set(walkAirOn, true) end
     if not quiet then
-        say(walkAirOn and "踏空行走已开启（空中也能往前走，还能跳）" or "踏空行走已关闭", walkAirOn or nil)
+        say(walkAirOn and "踏空行走已开启（脚下一块透明的板）" or "踏空行走已关闭，脚下的板已清除", walkAirOn or nil)
     end
 end
 
+-- 重生换了新角色，板要挪到新脚底下
+player.CharacterAdded:Connect(function(char)
+    if not walkAirOn then return end
+    task.delay(0.35, function()
+        if not walkAirOn then return end
+        local fy = footYOf(char)
+        if fy then createWalkPad(fy - 1.2) end
+    end)
+end)
 
 -- ===== 点按钮弹出的小窗（里面就一个踏空行走开关） =====
 local walkAirPanel = nil
