@@ -1115,103 +1115,66 @@ local flyToggle = makeToggle(page1, 148, "飞行", function(state)
     setFly(state)
 end)
 
--- ===== 踏空行走：用 AlignPosition 锁住高度，比每帧抹速度更硬 =====
+-- ===== 踏空行走：只补垂直速度，不碰位置、不碰朝向，所以不会打转 =====
 local walkAirOn = false
 local walkAirConn = nil
-local walkAtt = nil
-local walkAlign = nil
+local walkJumpConn = nil
 local walkLockY = nil     -- 锁定的高度：只许往上抬，不许往下掉
 
-local function teardownWalkAir()
-    if walkAirConn then walkAirConn:Disconnect(); walkAirConn = nil end
-    if walkAlign then pcall(function() walkAlign:Destroy() end); walkAlign = nil end
-    if walkAtt then pcall(function() walkAtt:Destroy() end); walkAtt = nil end
-    local char = player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        pcall(function()
-            hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
-            hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-        end)
-    end
-    walkLockY = nil
-end
-
-local setWalkAirRef = nil   -- 重生重建时要用
-
 setWalkAir = function(on, quiet)
-    teardownWalkAir()
+    if walkAirConn then walkAirConn:Disconnect(); walkAirConn = nil end
+    if walkJumpConn then walkJumpConn:Disconnect(); walkJumpConn = nil end
     walkAirOn = on and true or false
 
     if walkAirOn then
         if flying and setFly then setFly(false) end   -- 飞行先关，不然两边抢高度
         local char = player.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        walkLockY = root and root.Position.Y or nil
 
-        if root then
-            walkLockY = root.Position.Y
-            walkAtt = Instance.new("Attachment")
-            walkAtt.Name = "WalkAirAtt"
-            walkAtt.Parent = root
-
-            walkAlign = Instance.new("AlignPosition")
-            walkAlign.Name = "WalkAirAlign"
-            walkAlign.Mode = Enum.PositionAlignmentMode.OneAttachment
-            walkAlign.Attachment0 = walkAtt
-            walkAlign.MaxForce = 4000
-            walkAlign.Responsiveness = 25
-            walkAlign.ApplyAtCenterOfMass = false
-            walkAlign.Position = root.Position
-            walkAlign.Parent = walkAtt
-        end
-
-        -- 关掉"自由落体"和"摔倒"：脚下没东西也算站在地上（能跳），
-        -- 且不会被引擎判定成跌倒而翻倒旋转
-        if hum then
-            pcall(function()
-                hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
-                hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-            end)
-        end
-
-        walkAirConn = RunService.Stepped:Connect(function()
+        walkAirConn = RunService.Heartbeat:Connect(function()
             if flying or not walkAirOn then return end
             local c = player.Character
             local r = c and c:FindFirstChild("HumanoidRootPart")
-            local h = c and c:FindFirstChildOfClass("Humanoid")
             if not r then return end
 
-            -- 重生换了角色，约束跟着旧模型没了，重新建一套
-            if not walkAlign or not walkAlign.Parent then
-                if setWalkAirRef then setWalkAirRef(true, true) end
-                return
-            end
-
-            -- 往上跳就跟着抬（可以升高），往下不给降
             local v = r.AssemblyLinearVelocity
-            local st = h and h:GetState()
             local y = walkLockY or r.Position.Y
 
-            if v.Y > 2 or st == Enum.HumanoidStateType.Jumping then
-                if r.Position.Y > y then y = r.Position.Y end
-            end
-
-            -- 被外力推得太远就别硬拉，重新以当前位置为准，防止越拉越高
-            if math.abs(y - r.Position.Y) > 12 then
-                y = r.Position.Y
-            end
+            -- 往上跳 / 被抛起来就跟着抬，往下不给降
+            if v.Y > 2 and r.Position.Y > y then y = r.Position.Y end
+            -- 被外力推得太远就重置，防止越堆越高
+            if math.abs(y - r.Position.Y) > 12 then y = r.Position.Y end
             walkLockY = y
 
-            walkAlign.Position = Vector3.new(r.Position.X, y, r.Position.Z)
+            -- 正在往上走就别插手，让跳跃自然完成
+            if v.Y > 2 then return end
 
-            if h then
-                local s2 = h:GetState()
-                if s2 == Enum.HumanoidStateType.Freefall or s2 == Enum.HumanoidStateType.FallingDown then
-                    pcall(function() h:ChangeState(Enum.HumanoidStateType.Running) end)
-                end
-            end
+            -- 只改垂直速度：离目标越远补得越快，正好抵消每帧被重力吃掉的那点
+            local dy = y - r.Position.Y
+            local vy = math.clamp(dy * 12, -45, 45)
+            r.AssemblyLinearVelocity = Vector3.new(v.X, vy, v.Z)
         end)
+
+        -- 空中也能跳：直接监听跳跃输入，只有悬空时才自己补一下
+        if UIS.JumpRequest then
+            walkJumpConn = UIS.JumpRequest:Connect(function()
+                if not walkAirOn or flying then return end
+                local c = player.Character
+                local r = c and c:FindFirstChild("HumanoidRootPart")
+                local h = c and c:FindFirstChildOfClass("Humanoid")
+                if not r then return end
+
+                local st = h and h:GetState()
+                if st == Enum.HumanoidStateType.Freefall
+                or st == Enum.HumanoidStateType.FallingDown
+                or st == Enum.HumanoidStateType.Jumping then
+                    local v = r.AssemblyLinearVelocity
+                    r.AssemblyLinearVelocity = Vector3.new(v.X, 45, v.Z)
+                    if h then pcall(function() h:ChangeState(Enum.HumanoidStateType.Jumping) end) end
+                end
+            end)
+        end
     end
 
     if walkAirToggle then walkAirToggle.Set(walkAirOn, true) end
@@ -1220,7 +1183,6 @@ setWalkAir = function(on, quiet)
     end
 end
 
-setWalkAirRef = setWalkAir
 
 -- ===== 点按钮弹出的小窗（里面就一个踏空行走开关） =====
 local walkAirPanel = nil
