@@ -27,212 +27,6 @@ local function corner(obj, r)
     c.Parent = obj
 end
 
--- 开场状态：主窗要等开场演完再登场
-local SplashState = { active = false, waiters = {} }
-
-local function onSplashDone(fn)
-    if SplashState.active then
-        SplashState.waiters[#SplashState.waiters + 1] = fn
-    else
-        fn()
-    end
-end
-
-local function fireSplashDone()
-    SplashState.active = false
-    local list = SplashState.waiters
-    SplashState.waiters = {}
-    for _, fn in ipairs(list) do pcall(fn) end
-end
-
--- ===== 启动画面：一局游戏只弹一次，换服务器/换游戏自然会再弹 =====
-pcall(function()
-    if playerGui:FindFirstChild("DoubaoSplashDone") then return end
-    local marker = Instance.new("Folder")
-    marker.Name = "DoubaoSplashDone"
-    marker.Parent = playerGui
-    SplashState.active = true
-
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "DoubaoSplash"
-    sg.IgnoreGuiInset = true
-    sg.ResetOnSpawn = false
-    sg.DisplayOrder = 200
-    sg.Parent = playerGui
-
-    local T = TweenService
-    local OUTQ = Enum.EasingDirection.Out
-
-    -- 居中一张玻璃卡片，不做全屏黑底
-    local card = Instance.new("CanvasGroup")
-    card.AnchorPoint = Vector2.new(0.5, 0.5)
-    card.Position = UDim2.fromScale(0.5, 0.47)
-    card.Size = UDim2.fromOffset(300, 194)
-    card.BackgroundColor3 = Color3.fromRGB(14, 16, 23)
-    card.BackgroundTransparency = 0.08
-    card.GroupTransparency = 1
-    card.BorderSizePixel = 0
-    card.Parent = sg
-    corner(card, 16)
-
-    local cardStroke = Instance.new("UIStroke")
-    cardStroke.Color = Color3.fromRGB(58, 72, 100)
-    cardStroke.Thickness = 1
-    cardStroke.Transparency = 0.25
-    cardStroke.Parent = card
-
-    local cardScale = Instance.new("UIScale")
-    cardScale.Scale = 0.92
-    cardScale.Parent = card
-
-    -- 顶边一道细高光
-    local shine = Instance.new("Frame")
-    shine.Size = UDim2.new(1, -60, 0, 1)
-    shine.Position = UDim2.fromOffset(30, 1)
-    shine.BackgroundColor3 = Color3.fromRGB(80, 150, 255)
-    shine.BackgroundTransparency = 0.72
-    shine.BorderSizePixel = 0
-    shine.Parent = card
-
-    -- 蓝色圆角小标
-    local logo = Instance.new("Frame")
-    logo.Size = UDim2.fromOffset(44, 44)
-    logo.Position = UDim2.new(0.5, -22, 0, 22)
-    logo.BackgroundColor3 = Color3.fromRGB(46, 118, 240)
-    logo.BorderSizePixel = 0
-    logo.Parent = card
-    corner(logo, 12)
-
-    local logoStroke = Instance.new("UIStroke")
-    logoStroke.Color = Color3.fromRGB(126, 186, 255)
-    logoStroke.Thickness = 1
-    logoStroke.Transparency = 0.45
-    logoStroke.Parent = logo
-
-    local logoScale = Instance.new("UIScale")
-    logoScale.Scale = 0.68
-    logoScale.Parent = logo
-
-    local logoText = Instance.new("TextLabel")
-    logoText.Size = UDim2.fromScale(1, 1)
-    logoText.BackgroundTransparency = 1
-    logoText.Text = "豆"
-    logoText.Font = Enum.Font.SourceSansBold
-    logoText.TextSize = 22
-    logoText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    logoText.Parent = logo
-
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 36)
-    title.Position = UDim2.fromOffset(0, 74)
-    title.BackgroundTransparency = 1
-    title.Text = "豆包中心"
-    title.Font = Enum.Font.SourceSansBold
-    title.TextSize = 27
-    title.TextColor3 = Color3.fromRGB(240, 246, 255)
-    title.TextTransparency = 1
-    title.Parent = card
-
-    local en = Instance.new("TextLabel")
-    en.Size = UDim2.new(1, 0, 0, 14)
-    en.Position = UDim2.fromOffset(0, 110)
-    en.BackgroundTransparency = 1
-    en.Text = "DOUBAO Hub"
-    en.Font = Enum.Font.SourceSansSemibold
-    en.TextSize = 10
-    en.TextColor3 = Color3.fromRGB(108, 146, 200)
-    en.TextTransparency = 1
-    en.Parent = card
-
-    local barBg = Instance.new("Frame")
-    barBg.Size = UDim2.fromOffset(200, 3)
-    barBg.Position = UDim2.new(0.5, -100, 0, 145)
-    barBg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    barBg.BackgroundTransparency = 1
-    barBg.BorderSizePixel = 0
-    barBg.Parent = card
-    corner(barBg, 2)
-
-    local bar = Instance.new("Frame")
-    bar.Size = UDim2.fromOffset(0, 3)
-    bar.BackgroundColor3 = Color3.fromRGB(70, 150, 255)
-    bar.BorderSizePixel = 0
-    bar.Parent = barBg
-    corner(bar, 2)
-
-    local pct = Instance.new("TextLabel")
-    pct.AnchorPoint = Vector2.new(1, 0)
-    pct.Position = UDim2.new(1, 0, 1, 7)
-    pct.Size = UDim2.fromOffset(44, 14)
-    pct.BackgroundTransparency = 1
-    pct.Text = "0%"
-    pct.Font = Enum.Font.SourceSansSemibold
-    pct.TextSize = 10
-    pct.TextColor3 = Color3.fromRGB(130, 172, 232)
-    pct.TextXAlignment = Enum.TextXAlignment.Right
-    pct.TextTransparency = 1
-    pct.Parent = barBg
-
-    local hint = Instance.new("TextLabel")
-    hint.Size = UDim2.new(1, 0, 0, 14)
-    hint.Position = UDim2.new(0, 0, 1, -30)
-    hint.BackgroundTransparency = 1
-    hint.Text = "正在载入面板…"
-    hint.Font = Enum.Font.SourceSans
-    hint.TextSize = 10
-    hint.TextColor3 = Color3.fromRGB(118, 130, 152)
-    hint.TextTransparency = 1
-    hint.Parent = card
-
-    -- ① 0.30 卡片淡入并放大到位
-    task.delay(0.3, function()
-        T:Create(card, TweenInfo.new(0.55, Enum.EasingStyle.Quad, OUTQ), { GroupTransparency = 0 }):Play()
-        T:Create(cardScale, TweenInfo.new(0.65, Enum.EasingStyle.Back, OUTQ), { Scale = 1 }):Play()
-    end)
-
-    -- ② 0.85 蓝色小标弹出来
-    task.delay(0.85, function()
-        T:Create(logoScale, TweenInfo.new(0.5, Enum.EasingStyle.Back, OUTQ), { Scale = 1 }):Play()
-    end)
-
-    -- ③ 1.10 标题浮现
-    task.delay(1.1, function()
-        T:Create(title, TweenInfo.new(0.45), { TextTransparency = 0 }):Play()
-    end)
-
-    -- ④ 1.40 英文小标
-    task.delay(1.4, function()
-        T:Create(en, TweenInfo.new(0.4), { TextTransparency = 0 }):Play()
-    end)
-
-    -- ⑤ 1.65 进度条爬升 + 百分比跟数（2.5 秒走满）
-    task.delay(1.65, function()
-        T:Create(barBg, TweenInfo.new(0.3), { BackgroundTransparency = 0.8 }):Play()
-        T:Create(pct, TweenInfo.new(0.3), { TextTransparency = 0 }):Play()
-        T:Create(hint, TweenInfo.new(0.35), { TextTransparency = 0 }):Play()
-        T:Create(bar, TweenInfo.new(2.5, Enum.EasingStyle.Quint, OUTQ), { Size = UDim2.fromOffset(200, 3) }):Play()
-        task.spawn(function()
-            local t0 = os.clock()
-            while os.clock() - t0 < 2.5 do
-                local k = math.clamp((os.clock() - t0) / 2.5, 0, 1)
-                pcall(function() pct.Text = tostring(math.floor(k * 100)) .. "%" end)
-                task.wait(0.05)
-            end
-            pcall(function() pct.Text = "100%" end)
-        end)
-    end)
-
-    -- ⑥ 4.35 停半拍，卡片放大淡出；开场层彻底销毁后才叫主窗登场
-    task.delay(4.35, function()
-        T:Create(card, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { GroupTransparency = 1 }):Play()
-        T:Create(cardScale, TweenInfo.new(0.45, Enum.EasingStyle.Quad, OUTQ), { Scale = 1.05 }):Play()
-        task.delay(0.55, function()
-            pcall(function() sg:Destroy() end)
-            fireSplashDone()
-        end)
-    end)
-end)
-
 local function filterParams()
     local p = RaycastParams.new()
     local ok = pcall(function() p.FilterType = Enum.RaycastFilterType.Exclude end)
@@ -281,26 +75,15 @@ win.Active = true
 win.Parent = gui
 corner(win, 10)
 
--- 开场还在演的话主窗先藏着，等开场收尾那一刻缩放展开
-if SplashState.active then
-    win.Visible = false
-    local winScale = Instance.new("UIScale")
-    winScale.Scale = 0.86
-    winScale.Parent = win
-    onSplashDone(function()
-        win.Visible = true
-        TweenService:Create(winScale,
-            TweenInfo.new(0.68, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-            { Scale = 1 }):Play()
-    end)
-    -- 兜底：开场要是没正常收尾，几秒后也把窗口放出来，绝不留黑屏无窗口
-    task.delay(6.5, function()
-        if not win.Visible then
-            win.Visible = true
-            winScale.Scale = 1
-        end
-    end)
-end
+-- 窗口登场：先缩到 0.86，再用 0.68 秒慢慢展开到正常大小
+local winScale = Instance.new("UIScale")
+winScale.Scale = 0.86
+winScale.Parent = win
+task.delay(0.03, function()
+    TweenService:Create(winScale,
+        TweenInfo.new(0.68, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+        { Scale = 1 }):Play()
+end)
 
 local stroke = Instance.new("UIStroke")
 stroke.Color = Color3.fromRGB(48, 48, 48)
@@ -1815,50 +1598,51 @@ local function espScan()
     for _, m in ipairs(chars) do
         alive[m] = true
         if not espTargets[m] then
-            local lb = Instance.new("TextLabel")
-            lb.Name = "ESP_Tag"
-            lb.BackgroundTransparency = 1
-            lb.AnchorPoint = Vector2.new(0.5, 0.5)
-            lb.Size = UDim2.fromOffset(190, 58)
-            lb.Font = Enum.Font.SourceSansBold
-            lb.TextSize = 12
-            lb.TextWrapped = true
-            lb.TextColor3 = Color3.fromRGB(255, 255, 255)
-            lb.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-            lb.TextStrokeTransparency = 0.35
-            lb.Text = ""
-            lb.Visible = false
-            lb.Parent = espScreen
-
-            local bx = Instance.new("Frame")
-            bx.Name = "ESP_Box"
-            bx.BackgroundTransparency = 1
-            bx.Visible = false
-            bx.ZIndex = 1
-            bx.Parent = espScreen
-            local bs = Instance.new("UIStroke", bx)
-            bs.Thickness = 1.5
-            bs.Color = Color3.fromRGB(0, 210, 255)
-            bs.Transparency = 0
-
-            local owner = nil
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr.Character == m then
-                    owner = plr
-                    break
-                end
-            end
-            local rec = { label = lb, box = bx, stroke = bs, player = owner }
-
-            -- 包围盒记一次（0.3 秒刷新），之后每帧用 pivot 跟着走
+            -- 先算体积：部件被删空的模型算不出框，给它立标签就会变成
+            -- "名字悬在空白处定住"，这种直接不登记
             local okP, pcf = pcall(function() return m:GetPivot() end)
             local bcf, bsize = espBoxOf(m)
-            if bcf and bsize and okP and pcf then
-                rec.size = bsize
-                rec.localCF = pcf:ToObjectSpace(bcf)
-            end
+            if bcf and bsize and okP and pcf and (bsize.X + bsize.Y + bsize.Z) >= 1 then
+                local lb = Instance.new("TextLabel")
+                lb.Name = "ESP_Tag"
+                lb.BackgroundTransparency = 1
+                lb.AnchorPoint = Vector2.new(0.5, 0.5)
+                lb.Size = UDim2.fromOffset(190, 58)
+                lb.Font = Enum.Font.SourceSansBold
+                lb.TextSize = 12
+                lb.TextWrapped = true
+                lb.TextColor3 = Color3.fromRGB(255, 255, 255)
+                lb.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                lb.TextStrokeTransparency = 0.35
+                lb.Text = ""
+                lb.Visible = false
+                lb.Parent = espScreen
 
-            espTargets[m] = rec
+                local bx = Instance.new("Frame")
+                bx.Name = "ESP_Box"
+                bx.BackgroundTransparency = 1
+                bx.Visible = false
+                bx.ZIndex = 1
+                bx.Parent = espScreen
+                local bs = Instance.new("UIStroke", bx)
+                bs.Thickness = 1.5
+                bs.Color = Color3.fromRGB(0, 210, 255)
+                bs.Transparency = 0
+
+                local owner = nil
+                for _, plr in ipairs(Players:GetPlayers()) do
+                    if plr.Character == m then
+                        owner = plr
+                        break
+                    end
+                end
+
+                local rec = {
+                    label = lb, box = bx, stroke = bs, player = owner,
+                    size = bsize, localCF = pcf:ToObjectSpace(bcf),
+                }
+                espTargets[m] = rec
+            end
         end
     end
 
@@ -1961,7 +1745,7 @@ local function espRender()
         if lb and wp then
             local sp = cam:WorldToViewportPoint(wp)
             local muted = rec.player and espMute[rec.player]
-            if sp.Z <= 1 or not espTextOn or muted then
+            if sp.Z <= 1 or not espTextOn or muted or not rec.size then
                 lb.Visible = false
             else
                 local x, y = sp.X, sp.Y
