@@ -10,9 +10,10 @@
   放置：StarterPlayer → StarterPlayerScripts → LocalScript
 ]]
 
-local Players    = game:GetService("Players")
-local UIS        = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
+local Players      = game:GetService("Players")
+local UIS          = game:GetService("UserInputService")
+local RunService   = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local player    = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -25,6 +26,108 @@ local function corner(obj, r)
     c.CornerRadius = UDim.new(0, r)
     c.Parent = obj
 end
+
+-- ===== 启动画面：一局游戏只弹一次，换服务器/换游戏自然会再弹 =====
+pcall(function()
+    if playerGui:FindFirstChild("DoubaoSplashDone") then return end
+    local marker = Instance.new("Folder")
+    marker.Name = "DoubaoSplashDone"
+    marker.Parent = playerGui
+
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "DoubaoSplash"
+    sg.IgnoreGuiInset = true
+    sg.ResetOnSpawn = false
+    sg.DisplayOrder = 100
+    sg.Parent = playerGui
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.fromScale(1, 1)
+    bg.BackgroundColor3 = Color3.fromRGB(5, 7, 11)
+    bg.BackgroundTransparency = 1
+    bg.BorderSizePixel = 0
+    bg.Parent = sg
+
+    local title = Instance.new("TextLabel")
+    title.AnchorPoint = Vector2.new(0.5, 0.5)
+    title.Position = UDim2.fromScale(0.5, 0.46)
+    title.Size = UDim2.fromOffset(360, 56)
+    title.BackgroundTransparency = 1
+    title.Text = "豆包中心"
+    title.Font = Enum.Font.SourceSansBold
+    title.TextSize = 42
+    title.TextColor3 = Color3.fromRGB(238, 245, 255)
+    title.TextTransparency = 1
+    title.ZIndex = 2
+    title.Parent = bg
+
+    local glow = Instance.new("Frame")
+    glow.AnchorPoint = Vector2.new(0.5, 0.5)
+    glow.Position = UDim2.fromScale(0.5, 0.53)
+    glow.Size = UDim2.fromOffset(0, 2)
+    glow.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
+    glow.BorderSizePixel = 0
+    glow.ZIndex = 3
+    glow.Parent = bg
+
+    local sub = Instance.new("TextLabel")
+    sub.AnchorPoint = Vector2.new(0.5, 0.5)
+    sub.Position = UDim2.fromScale(0.5, 0.58)
+    sub.Size = UDim2.fromOffset(300, 20)
+    sub.BackgroundTransparency = 1
+    sub.Text = "正在载入面板…"
+    sub.Font = Enum.Font.SourceSans
+    sub.TextSize = 13
+    sub.TextColor3 = Color3.fromRGB(150, 160, 180)
+    sub.TextTransparency = 1
+    sub.Parent = bg
+
+    local barBg = Instance.new("Frame")
+    barBg.AnchorPoint = Vector2.new(0.5, 0.5)
+    barBg.Position = UDim2.fromScale(0.5, 0.65)
+    barBg.Size = UDim2.fromOffset(220, 3)
+    barBg.BackgroundColor3 = Color3.fromRGB(30, 34, 44)
+    barBg.BorderSizePixel = 0
+    barBg.Parent = bg
+    corner(barBg, 2)
+
+    local bar = Instance.new("Frame")
+    bar.Size = UDim2.fromOffset(0, 3)
+    bar.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
+    bar.BorderSizePixel = 0
+    bar.Parent = barBg
+    corner(bar, 2)
+
+    local scan = Instance.new("Frame")
+    scan.Size = UDim2.new(1, 0, 0, 1)
+    scan.Position = UDim2.fromScale(0, 0)
+    scan.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
+    scan.BackgroundTransparency = 0.75
+    scan.BorderSizePixel = 0
+    scan.Parent = bg
+
+    local T = TweenService
+    T:Create(bg, TweenInfo.new(0.25), { BackgroundTransparency = 0.12 }):Play()
+    T:Create(title, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0.1), { TextTransparency = 0 }):Play()
+    T:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0.22), { Size = UDim2.fromOffset(200, 2) }):Play()
+    T:Create(sub, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0.38), { TextTransparency = 0 }):Play()
+    T:Create(bar, TweenInfo.new(1.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0.3), { Size = UDim2.fromOffset(220, 3) }):Play()
+    T:Create(scan, TweenInfo.new(2.3, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0.2), { Position = UDim2.fromScale(0, 1) }):Play()
+
+    task.delay(2.65, function()
+        local out = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        T:Create(bg, out, { BackgroundTransparency = 1 }):Play()
+        T:Create(title, out, { TextTransparency = 1 }):Play()
+        T:Create(sub, out, { TextTransparency = 1 }):Play()
+        T:Create(glow, out, { BackgroundTransparency = 1 }):Play()
+        T:Create(barBg, out, { BackgroundTransparency = 1 }):Play()
+        T:Create(bar, out, { BackgroundTransparency = 1 }):Play()
+        T:Create(scan, out, { BackgroundTransparency = 1 }):Play()
+        task.delay(0.4, function()
+            pcall(function() sg:Destroy() end)
+        end)
+    end)
+end)
 
 local function filterParams()
     local p = RaycastParams.new()
@@ -89,7 +192,7 @@ titleBar.Parent = win
 corner(titleBar, 10)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -60, 1, 0)
+title.Size = UDim2.new(1, -105, 1, 0)
 title.Position = UDim2.fromOffset(14, 0)
 title.BackgroundTransparency = 1
 title.Text = "豆包中心"
@@ -128,6 +231,86 @@ end
 
 close.MouseButton1Click:Connect(doClose)
 pcall(function() close.Activated:Connect(doClose) end)
+
+-- ===== 最小化按钮（× 左边）=====
+local mini = Instance.new("TextButton")
+mini.Size = UDim2.fromOffset(28, 28)
+mini.Position = UDim2.new(1, -70, 0.5, 0)
+mini.AnchorPoint = Vector2.new(0, 0.5)
+mini.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mini.BorderSizePixel = 0
+mini.AutoButtonColor = false
+mini.Text = "—"
+mini.Font = Enum.Font.SourceSansBold
+mini.TextSize = 16
+mini.TextColor3 = Color3.fromRGB(160, 160, 160)
+mini.Parent = titleBar
+corner(mini, 6)
+
+mini.MouseEnter:Connect(function()
+    mini.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    mini.TextColor3 = Color3.fromRGB(230, 230, 230)
+end)
+mini.MouseLeave:Connect(function()
+    mini.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    mini.TextColor3 = Color3.fromRGB(160, 160, 160)
+end)
+
+local minimized = false
+local FULL_SIZE = UDim2.fromOffset(460, 330)
+local MINI_SIZE = UDim2.fromOffset(128, 32)
+
+-- 最小化 / 展开的过渡：只加动画，尺寸、位置数值跟以前一模一样
+local T_MINI = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local minTweens = {}
+
+local function tweenTo(obj, goal)
+    local old = minTweens[obj]
+    if old then pcall(function() old:Cancel() end) end
+    local tw = TweenService:Create(obj, T_MINI, goal)
+    minTweens[obj] = tw
+    tw:Play()
+end
+
+local function applyMinimize()
+    if minimized then
+        title.TextXAlignment = Enum.TextXAlignment.Right
+        title.TextSize = 13
+        close.Visible = false
+        mini.TextSize = 13
+        tweenTo(win, {
+            Size = MINI_SIZE,
+            Position = UDim2.new(win.Position.X.Scale, win.Position.X.Offset, win.Position.Y.Scale, win.Position.Y.Offset - 149),
+        })
+        tweenTo(titleBar, { Size = UDim2.new(1, -2, 0, 32) })
+        tweenTo(title, { Position = UDim2.fromOffset(0, 0), Size = UDim2.new(1, -46, 1, 0) })
+        tweenTo(mini, { Size = UDim2.fromOffset(20, 20), Position = UDim2.new(1, -26, 0.5, 0) })
+    else
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.TextSize = 15
+        close.Visible = true
+        mini.TextSize = 16
+        tweenTo(win, {
+            Size = FULL_SIZE,
+            Position = UDim2.new(win.Position.X.Scale, win.Position.X.Offset, win.Position.Y.Scale, win.Position.Y.Offset + 149),
+        })
+        tweenTo(titleBar, { Size = UDim2.new(1, -2, 0, 42) })
+        tweenTo(title, { Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -105, 1, 0) })
+        tweenTo(mini, { Size = UDim2.fromOffset(28, 28), Position = UDim2.new(1, -70, 0.5, 0) })
+    end
+end
+
+local miniLast = 0
+local function toggleMini()
+    local now = os.clock()
+    if now - miniLast < 0.55 then return end
+    miniLast = now
+    minimized = not minimized
+    applyMinimize()
+end
+
+mini.MouseButton1Click:Connect(toggleMini)
+pcall(function() mini.Activated:Connect(toggleMini) end)
 
 -- 不管是点 ×、脚本删 gui、还是别的原因没了，都复位一次
 pcall(function()
@@ -173,12 +356,6 @@ local page1 = Instance.new("Frame")
 page1.Size = UDim2.fromScale(1, 1)
 page1.BackgroundTransparency = 1
 page1.Parent = pages
-
-local page2 = Instance.new("Frame")
-page2.Size = UDim2.fromScale(1, 1)
-page2.BackgroundTransparency = 1
-page2.Visible = false
-page2.Parent = pages
 
 local page3 = Instance.new("Frame")
 page3.Size = UDim2.fromScale(1, 1)
@@ -227,7 +404,7 @@ local function say(text, ok)
 end
 
 -- ===== 侧边栏按钮 =====
-local pagesList = { page1, page2, page3, page4 }
+local pagesList = { page1, page3, page4 }
 for _, p in ipairs(emptyPages) do
     pagesList[#pagesList + 1] = p
 end
@@ -271,11 +448,10 @@ local function makeCategory(name, order, pageIndex)
 end
 
 makeCategory("修改角色属性", 1, 1)
-makeCategory("方块无碰撞", 2, 2)
-makeCategory("方块尺寸", 3, 3)
+makeCategory("方块尺寸", 2, 2)
+makeCategory("高亮 ESP", 3, 3)
 makeCategory("空4", 4, 4)
-makeCategory("高亮 ESP", 5, 5)
-for i = 6, 10 do
+for i = 5, 9 do
     makeCategory("空" .. i, i, i)
 end
 
@@ -338,30 +514,47 @@ local function makeInputRow(parent, y, placeholder, onSubmit, defaultText)
     box.FocusLost:Connect(function(enter) if enter then fire() end end)
 end
 
--- ===== 开关行 =====
-local function makeToggle(parent, y, labelText, onChange)
+-- ===== 开关行（整行版 / 半宽版共用这一套实现）=====
+-- 颜色、滑块、"开/关"文字完全一致；只有轨道和字号按宽窄缩一档
+local T_TOGGLE = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+local function buildToggle(parent, x, y, w, labelText, onChange)
+    local compact = (w ~= nil)
+    local trackW = compact and 34 or 40
+    local trackH = compact and 20 or 22
+    local knobS  = compact and 14 or 16
+    local fontS  = compact and 11 or 13
+    local stateW = compact and 26 or 34
+    local gapR   = compact and 6 or 10      -- 轨道离右边缘
+    local gapM   = compact and 4 or 10      -- "开/关"字与轨道之间
+    local labelR = gapR + trackW + gapM + stateW + (compact and 6 or 8)
+    local padL   = compact and 10 or 12
+    local knobY  = (trackH - knobS) / 2
+    local OFF_BG = Color3.fromRGB(64, 64, 68)      -- 关闭态底色（比原来的 40,40,40 亮一档）
+    local ON_BG  = Color3.fromRGB(60, 140, 255)    -- 开启态蓝色（保持原样）
+
     local row = Instance.new("Frame")
-    row.Position = UDim2.fromOffset(14, y)
-    row.Size = UDim2.new(1, -28, 0, 44)
+    row.Position = UDim2.fromOffset(x, y)
+    row.Size = compact and UDim2.fromOffset(w, 44) or UDim2.new(1, -28, 0, 44)
     row.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
     row.BorderSizePixel = 0
     row.Parent = parent
     corner(row, 6)
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -130, 1, 0)
-    label.Position = UDim2.fromOffset(12, 0)
+    label.Size = UDim2.new(1, -labelR, 1, 0)
+    label.Position = UDim2.fromOffset(padL, 0)
     label.BackgroundTransparency = 1
     label.Text = labelText
     label.Font = Enum.Font.SourceSansBold
-    label.TextSize = 13
+    label.TextSize = fontS
     label.TextColor3 = Color3.fromRGB(235, 235, 235)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = row
 
     local stateLabel = Instance.new("TextLabel")
-    stateLabel.Size = UDim2.fromOffset(34, 18)
-    stateLabel.Position = UDim2.new(1, -94, 0.5, 0)
+    stateLabel.Size = UDim2.fromOffset(stateW, 18)
+    stateLabel.Position = UDim2.new(1, -(gapR + trackW + gapM + stateW), 0.5, 0)
     stateLabel.AnchorPoint = Vector2.new(0, 0.5)
     stateLabel.BackgroundTransparency = 1
     stateLabel.Text = "关"
@@ -372,55 +565,262 @@ local function makeToggle(parent, y, labelText, onChange)
     stateLabel.Parent = row
 
     local track = Instance.new("Frame")
-    track.Size = UDim2.fromOffset(40, 22)
-    track.Position = UDim2.new(1, -50, 0.5, 0)
+    track.Size = UDim2.fromOffset(trackW, trackH)
+    track.Position = UDim2.new(1, -(gapR + trackW), 0.5, 0)
     track.AnchorPoint = Vector2.new(0, 0.5)
-    track.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    track.BackgroundColor3 = OFF_BG
     track.BorderSizePixel = 0
     track.Parent = row
-    corner(track, 11)
+    corner(track, trackH / 2)
 
     local knob = Instance.new("Frame")
-    knob.Size = UDim2.fromOffset(16, 16)
-    knob.Position = UDim2.fromOffset(3, 3)
+    knob.Size = UDim2.fromOffset(knobS, knobS)
+    knob.Position = UDim2.fromOffset(3, knobY)
     knob.BackgroundColor3 = Color3.fromRGB(235, 235, 235)
     knob.BorderSizePixel = 0
     knob.Parent = track
-    corner(knob, 8)
+    corner(knob, knobS / 2)
+
+    -- 透明按钮盖住整行：点文字、点空白都能切换，手机上也一样
+    local hit = Instance.new("TextButton")
+    hit.Size = UDim2.new(1, 0, 1, 0)
+    hit.BackgroundTransparency = 1
+    hit.Text = ""
+    hit.AutoButtonColor = false
+    hit.Parent = row
 
     local state = false
+    local api = {}
+    local posTween, colTween = nil, nil
 
-    local function paint()
+    -- 开关是滑过去 + 颜色淡过去的，不是硬跳
+    function api.Set(v, silent)
+        state = (v == true)
         if state then
-            track.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
-            knob.Position = UDim2.fromOffset(21, 3)
             stateLabel.Text = "开"
             stateLabel.TextColor3 = Color3.fromRGB(110, 200, 130)
         else
-            track.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-            knob.Position = UDim2.fromOffset(3, 3)
             stateLabel.Text = "关"
             stateLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
         end
-    end
 
-    local api = {}
-    function api.Set(v, silent)
-        state = v and true or false
-        paint()
+        local goalX = state and (trackW - knobS - 3) or 3
+        if posTween then pcall(function() posTween:Cancel() end) end
+        posTween = TweenService:Create(knob, T_TOGGLE, { Position = UDim2.fromOffset(goalX, knobY) })
+        posTween:Play()
+
+        if colTween then pcall(function() colTween:Cancel() end) end
+        colTween = TweenService:Create(track, T_TOGGLE, { BackgroundColor3 = state and ON_BG or OFF_BG })
+        colTween:Play()
+
         if not silent and onChange then onChange(state) end
     end
-    api.Get = function() return state end
 
-    row.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            api.Set(not state)
-        end
-    end)
+    function api.Get()
+        return state
+    end
 
+    hit.MouseButton1Click:Connect(function() api.Set(not state) end)
     return api
 end
+
+-- 整行版：默认 14 左边距、满宽
+local function makeToggle(parent, y, labelText, onChange)
+    return buildToggle(parent, 14, y, nil, labelText, onChange)
+end
+
+-- 半宽版：指定 x、宽度（ESP 页一行两个）
+local function makeToggleAt(parent, x, y, w, labelText, onChange)
+    return buildToggle(parent, x, y, w, labelText, onChange)
+end
+
+-- ===== 勾选框行（ESP 页用，方框里打勾的那种）=====
+local CHK_OFF = Color3.fromRGB(64, 64, 68)
+local CHK_ON  = Color3.fromRGB(60, 140, 255)
+local CHK_BORDER_OFF = Color3.fromRGB(90, 94, 104)
+local CHK_BORDER_ON  = Color3.fromRGB(120, 190, 255)
+
+local function makeCheckRow(parent, x, y, w, labelText, onChange)
+    local row = Instance.new("Frame")
+    row.Position = UDim2.fromOffset(x, y)
+    row.Size = w and UDim2.fromOffset(w, 44) or UDim2.new(1, -28, 0, 44)
+    row.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+    row.BorderSizePixel = 0
+    row.Parent = parent
+    corner(row, 6)
+
+    local box = Instance.new("Frame")
+    box.Size = UDim2.fromOffset(18, 18)
+    box.Position = UDim2.fromOffset(10, 13)
+    box.BackgroundColor3 = CHK_OFF
+    box.BorderSizePixel = 0
+    box.Parent = row
+    corner(box, 4)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1
+    stroke.Color = CHK_BORDER_OFF
+    stroke.Transparency = 0
+    stroke.Parent = box
+
+    local tick = Instance.new("TextLabel")
+    tick.Size = UDim2.fromScale(1, 1)
+    tick.BackgroundTransparency = 1
+    tick.Text = "✓"
+    tick.Font = Enum.Font.SourceSansBold
+    tick.TextSize = 13
+    tick.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tick.TextYAlignment = Enum.TextYAlignment.Center
+    tick.Visible = false
+    tick.Parent = box
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -46, 1, 0)
+    label.Position = UDim2.fromOffset(36, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 11
+    label.TextColor3 = Color3.fromRGB(235, 235, 235)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = row
+
+    local hit = Instance.new("TextButton")
+    hit.Size = UDim2.new(1, 0, 1, 0)
+    hit.BackgroundTransparency = 1
+    hit.Text = ""
+    hit.AutoButtonColor = false
+    hit.Parent = row
+
+    local state = false
+    local api = {}
+    local colorTween = nil
+
+    function api.Set(v, silent)
+        state = (v == true)
+        tick.Visible = state
+        if colorTween then pcall(function() colorTween:Cancel() end) end
+        colorTween = TweenService:Create(box, T_TOGGLE, { BackgroundColor3 = state and CHK_ON or CHK_OFF })
+        colorTween:Play()
+        stroke.Color = state and CHK_BORDER_ON or CHK_BORDER_OFF
+        if not silent and onChange then onChange(state) end
+    end
+
+    function api.Get()
+        return state
+    end
+
+    hit.MouseButton1Click:Connect(function() api.Set(not state) end)
+    return api
+end
+
+-- ===== 单选框组：一组里只能选一个 =====
+-- 用法：local g = makeRadioGroup(pageX, 14, 12, 303, {"轮廓", "方框", "两者"}, 1,
+--            function(index, text) ... end)
+-- g.Set(2) 切换 / g.Set(2, true) 静默 / g.Get() 取当前序号
+local function makeRadioGroup(parent, x, y, w, options, initial, onChange)
+    local ROW_H, GAP = 44, 4
+    local count = #options
+
+    local holder = Instance.new("Frame")
+    holder.Position = UDim2.fromOffset(x, y)
+    holder.Size = UDim2.fromOffset(w, count * ROW_H + (count - 1) * GAP)
+    holder.BackgroundTransparency = 1
+    holder.Parent = parent
+
+    local items = {}
+    local current = initial or 1
+    local api = {}
+
+    local function paint()
+        for i, it in ipairs(items) do
+            local on = (i == current)
+            it.ring.BackgroundColor3 = on and CHK_ON or CHK_OFF
+            it.stroke.Color = on and CHK_BORDER_ON or CHK_BORDER_OFF
+            it.dot.Visible = on
+        end
+    end
+
+    function api.Set(index, silent)
+        index = math.floor(tonumber(index) or current)
+        if index < 1 or index > count then return end
+        if index == current then
+            paint()
+            return
+        end
+        current = index
+        paint()
+        if not silent and onChange then onChange(current, options[current]) end
+    end
+
+    function api.Get()
+        return current, options[current]
+    end
+
+    for i, text in ipairs(options) do
+        local row = Instance.new("Frame")
+        row.Position = UDim2.fromOffset(0, (i - 1) * (ROW_H + GAP))
+        row.Size = UDim2.fromOffset(w, ROW_H)
+        row.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+        row.BorderSizePixel = 0
+        row.Parent = holder
+        corner(row, 6)
+
+        local ring = Instance.new("Frame")
+        ring.Size = UDim2.fromOffset(18, 18)
+        ring.Position = UDim2.fromOffset(10, 13)
+        ring.BackgroundColor3 = CHK_OFF
+        ring.BorderSizePixel = 0
+        ring.Parent = row
+        corner(ring, 9)
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = 1
+        stroke.Color = CHK_BORDER_OFF
+        stroke.Transparency = 0
+        stroke.Parent = ring
+
+        local dot = Instance.new("Frame")
+        dot.Size = UDim2.fromOffset(8, 8)
+        dot.Position = UDim2.fromOffset(5, 5)
+        dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        dot.BorderSizePixel = 0
+        dot.Visible = false
+        dot.Parent = ring
+        corner(dot, 4)
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -46, 1, 0)
+        label.Position = UDim2.fromOffset(36, 0)
+        label.BackgroundTransparency = 1
+        label.Text = text
+        label.Font = Enum.Font.SourceSansBold
+        label.TextSize = 11
+        label.TextColor3 = Color3.fromRGB(235, 235, 235)
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = row
+
+        local hit = Instance.new("TextButton")
+        hit.Size = UDim2.new(1, 0, 1, 0)
+        hit.BackgroundTransparency = 1
+        hit.Text = ""
+        hit.AutoButtonColor = false
+        hit.Parent = row
+
+        hit.MouseButton1Click:Connect(function()
+            if current == i then return end
+            current = i
+            paint()
+            if onChange then onChange(current, text) end
+        end)
+
+        items[i] = { ring = ring, stroke = stroke, dot = dot, label = label }
+    end
+
+    paint()
+    return api
+end
+
 
 -- ===== 普通按钮（满宽） =====
 local function makeButton(parent, y, text, onClick)
@@ -449,102 +849,6 @@ local function makeButton(parent, y, text, onClick)
     return btn
 end
 
--- ===== 下拉选择框 =====
-local function makeModeDropdown(parent, y, options, initial, onPick)
-    local labelMap = {}
-    for _, o in ipairs(options) do labelMap[o.value] = o.label end
-
-    local box = Instance.new("Frame")
-    box.Position = UDim2.fromOffset(14, y)
-    box.Size = UDim2.new(1, -28, 0, 36)
-    box.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
-    box.BorderSizePixel = 0
-    box.ClipsDescendants = true
-    box.ZIndex = 4
-    box.Parent = parent
-    corner(box, 6)
-
-    local head = Instance.new("TextButton")
-    head.Size = UDim2.new(1, 0, 0, 36)
-    head.BackgroundTransparency = 1
-    head.AutoButtonColor = false
-    head.Text = "贴地方式：" .. (labelMap[initial] or initial)
-    head.Font = Enum.Font.SourceSans
-    head.TextSize = 12
-    head.TextColor3 = Color3.fromRGB(215, 215, 215)
-    head.TextXAlignment = Enum.TextXAlignment.Left
-    head.ZIndex = 5
-    head.Parent = box
-    local hp = Instance.new("UIPadding", head)
-    hp.PaddingLeft = UDim.new(0, 12)
-    hp.PaddingRight = UDim.new(0, 12)
-
-    local list = Instance.new("Frame")
-    list.Position = UDim2.fromOffset(0, 36)
-    list.Size = UDim2.new(1, 0, 0, 0)
-    list.BackgroundTransparency = 1
-    list.Visible = false
-    list.ZIndex = 5
-    list.Parent = box
-
-    local ll = Instance.new("UIListLayout", list)
-    ll.Padding = UDim.new(0, 3)
-    ll.SortOrder = Enum.SortOrder.LayoutOrder
-    local lp = Instance.new("UIPadding", list)
-    lp.PaddingLeft = UDim.new(0, 6)
-    lp.PaddingRight = UDim.new(0, 6)
-    lp.PaddingBottom = UDim.new(0, 6)
-
-    local open = false
-    local current = initial
-    local rowsH = 0
-
-    local function closeList()
-        open = false
-        list.Visible = false
-        box.Size = UDim2.new(1, -28, 0, 36)
-    end
-
-    local function openList()
-        open = true
-        list.Visible = true
-        list.Size = UDim2.new(1, 0, 0, rowsH)
-        box.Size = UDim2.new(1, -28, 0, 36 + rowsH)
-    end
-
-    for i, o in ipairs(options) do
-        rowsH = rowsH + 3 + 30
-        local item = Instance.new("TextButton")
-        item.Size = UDim2.new(1, 0, 0, 30)
-        item.LayoutOrder = i
-        item.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-        item.BorderSizePixel = 0
-        item.AutoButtonColor = false
-        item.Text = o.label
-        item.Font = Enum.Font.SourceSans
-        item.TextSize = 12
-        item.TextColor3 = Color3.fromRGB(200, 200, 200)
-        item.TextXAlignment = Enum.TextXAlignment.Left
-        item.ZIndex = 6
-        item.Parent = list
-        corner(item, 5)
-        local ip = Instance.new("UIPadding", item)
-        ip.PaddingLeft = UDim.new(0, 10)
-
-        item.MouseButton1Click:Connect(function()
-            current = o.value
-            head.Text = "贴地方式：" .. o.label
-            closeList()
-            if onPick then onPick(o.value) end
-        end)
-    end
-
-    head.MouseButton1Click:Connect(function()
-        if open then closeList() else openList() end
-    end)
-
-    return { Get = function() return current end }
-end
 
 -- ===== 第 1 页：角色属性 =====
 local FLY_SPEED = 40          -- 飞行速度（下面输入框可以改）
@@ -764,6 +1068,8 @@ local function buildFlyBody(root)
 end
 
 local setFly = nil          -- 先占位，flyStep 里要用
+local setWalkAir = nil      -- 踏空行走，飞行时两边互斥
+local walkAirToggle = nil
 
 local function flyStep()
     if not flying then return end
@@ -852,6 +1158,7 @@ end
 
 setFly = function(on)
     if on then
+        if setWalkAir then setWalkAir(false) end   -- 飞行和踏空行走互斥
         flying = true
         -- 飞行也能穿墙：碰撞继续关着
         disableCharCollision()
@@ -893,9 +1200,115 @@ local flyToggle = makeToggle(page1, 148, "飞行", function(state)
     setFly(state)
 end)
 
+-- ===== 踏空行走：每帧只抹掉"往下掉"的速度，往上跳不受影响 =====
+local walkAirOn = false
+local walkAirConn = nil
+
+setWalkAir = function(on, quiet)
+    walkAirOn = on and true or false
+    if walkAirConn then walkAirConn:Disconnect(); walkAirConn = nil end
+    if walkAirOn then
+        if flying and setFly then setFly(false) end   -- 飞行先关，不然两边抢高度
+        walkAirConn = RunService.Heartbeat:Connect(function()
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+            if flying then return end
+            local v = root.AssemblyLinearVelocity
+            if v.Y < 0 then
+                root.AssemblyLinearVelocity = Vector3.new(v.X, 0, v.Z)
+            end
+        end)
+    end
+    if walkAirToggle then walkAirToggle.Set(walkAirOn, true) end
+    if not quiet then
+        say(walkAirOn and "踏空行走已开启（空中也能往前走）" or "踏空行走已关闭", walkAirOn or nil)
+    end
+end
+
+-- ===== 点按钮弹出的小窗（里面就一个踏空行走开关） =====
+local walkAirPanel = nil
+
+local function buildWalkAirPanel()
+    local mask = Instance.new("TextButton")
+    mask.Name = "WalkAirMask"
+    mask.Size = UDim2.fromScale(1, 1)
+    mask.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    mask.BackgroundTransparency = 0.45
+    mask.BorderSizePixel = 0
+    mask.AutoButtonColor = false
+    mask.Text = ""
+    mask.ZIndex = 20
+    mask.Visible = false
+    mask.Parent = win
+
+    local panel = Instance.new("TextButton")
+    panel.Size = UDim2.fromOffset(210, 104)
+    panel.Position = UDim2.fromScale(0.5, 0.5)
+    panel.AnchorPoint = Vector2.new(0.5, 0.5)
+    panel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    panel.BorderSizePixel = 0
+    panel.AutoButtonColor = false
+    panel.Text = ""
+    panel.ZIndex = 21
+    panel.Parent = mask
+    corner(panel, 8)
+
+    local t = Instance.new("TextLabel")
+    t.Size = UDim2.new(1, -50, 0, 26)
+    t.Position = UDim2.fromOffset(14, 0)
+    t.BackgroundTransparency = 1
+    t.Text = "踏空行走"
+    t.Font = Enum.Font.SourceSansBold
+    t.TextSize = 13
+    t.TextColor3 = Color3.fromRGB(235, 235, 235)
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.ZIndex = 23
+    t.Parent = panel
+
+    local xBtn = Instance.new("TextButton")
+    xBtn.Size = UDim2.fromOffset(22, 22)
+    xBtn.Position = UDim2.new(1, -28, 0, 2)
+    xBtn.BackgroundTransparency = 1
+    xBtn.BorderSizePixel = 0
+    xBtn.AutoButtonColor = false
+    xBtn.Text = "×"
+    xBtn.Font = Enum.Font.SourceSansBold
+    xBtn.TextSize = 16
+    xBtn.TextColor3 = Color3.fromRGB(190, 190, 190)
+    xBtn.ZIndex = 24
+    xBtn.Parent = panel
+
+    walkAirToggle = makeToggleAt(panel, 14, 36, 182, "开启踏空行走", function(state)
+        setWalkAir(state)
+    end)
+
+    -- 关窗就把踏空行走一起关掉，下次打开是干净的关闭状态
+    local function closePanel()
+        mask.Visible = false
+        setWalkAir(false, true)
+        if walkAirToggle then walkAirToggle.Set(false, true) end
+    end
+
+    -- 只有右上角那个 × 能关，点遮罩空白不关
+    xBtn.MouseButton1Click:Connect(closePanel)
+
+    walkAirPanel = mask
+end
+
+buildWalkAirPanel()
+
+-- 第 1 页底部那个按钮：点了就把小窗调出来
+makeButton(page1, 240, "踏空行走", function()
+    if walkAirPanel then
+        setWalkAir(false, true)                    -- 打开永远是关闭态
+        if walkAirToggle then walkAirToggle.Set(false, true) end
+        walkAirPanel.Visible = true
+    end
+end)
+
 -- ===== 屏幕点选：手机没有准心，直接点哪块就选哪块 =====
-local picking = nil     -- nil / "mark"（变无碰撞）/ "size"（读尺寸）
-local pickBtn = nil
+local picking = nil     -- nil / "size"（读尺寸）
 local sizeBtn = nil
 local setPicking = nil
 
@@ -917,214 +1330,7 @@ local function partAt(pos)
     return nil
 end
 
--- ===== 第 2 页：点方块 → 变无碰撞，并列进列表 =====
-local marked = {}        -- part -> 这一行的 Frame
-local markedCount = 0
-local viewMode = "box"   -- box / line 连线
-local viewObj = nil
-
-local function clearView()
-    if viewObj then
-        viewObj:Destroy()
-        viewObj = nil
-    end
-end
-
-local function viewPart(part)
-    if not part or not part.Parent then
-        clearView()
-        return
-    end
-    clearView()
-
-    if viewMode == "box" then
-        local box = Instance.new("SelectionBox")
-        box.Adornee = part
-        box.Color3 = Color3.fromRGB(90, 190, 255)
-        box.LineThickness = 0.18
-        box.SurfaceTransparency = 0.15
-        box.Parent = workspace
-        viewObj = box
-    else
-        local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if not root then
-            say("找不到人物位置，拉不了线", false)
-            return
-        end
-        local a = root.Position
-        local b = part.Position
-        local len = (b - a).Magnitude
-        if len < 0.2 then return end
-        local line = Instance.new("Part")
-        line.Name = "查看连线"
-        line.Anchored = true
-        line.CanCollide = false
-        line.CanQuery = false
-        line.CanTouch = false
-        line.Material = Enum.Material.Neon
-        line.Color = Color3.fromRGB(90, 190, 255)
-        line.Transparency = 0.3
-        line.Size = Vector3.new(0.25, 0.25, len)
-        line.CFrame = CFrame.lookAt((a + b) / 2, b)
-        line.Parent = workspace
-        viewObj = line
-    end
-
-    local mine = viewObj
-    task.delay(4, function()
-        if viewObj == mine then clearView() end
-    end)
-end
-
-pickBtn = Instance.new("TextButton")
-pickBtn.Position = UDim2.fromOffset(14, 8)
-pickBtn.Size = UDim2.new(1, -28, 0, 36)
-pickBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
-pickBtn.BorderSizePixel = 0
-pickBtn.AutoButtonColor = false
-pickBtn.Text = "点我开始选方块（变无碰撞）"
-pickBtn.Font = Enum.Font.SourceSansBold
-pickBtn.TextSize = 12
-pickBtn.TextColor3 = Color3.fromRGB(225, 225, 225)
-pickBtn.Parent = page2
-corner(pickBtn, 6)
-
-local viewToggle = Instance.new("TextButton")
-viewToggle.Position = UDim2.fromOffset(14, 52)
-viewToggle.Size = UDim2.fromOffset(146, 28)
-viewToggle.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
-viewToggle.BorderSizePixel = 0
-viewToggle.AutoButtonColor = false
-viewToggle.Text = "查看方式：高亮"
-viewToggle.Font = Enum.Font.SourceSansBold
-viewToggle.TextSize = 11
-viewToggle.TextColor3 = Color3.fromRGB(215, 215, 215)
-viewToggle.Parent = page2
-corner(viewToggle, 6)
-
-local restoreBtn = Instance.new("TextButton")
-restoreBtn.Position = UDim2.new(1, -160, 0, 52)
-restoreBtn.Size = UDim2.fromOffset(146, 28)
-restoreBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
-restoreBtn.BorderSizePixel = 0
-restoreBtn.AutoButtonColor = false
-restoreBtn.Text = "全部恢复"
-restoreBtn.Font = Enum.Font.SourceSansBold
-restoreBtn.TextSize = 11
-restoreBtn.TextColor3 = Color3.fromRGB(215, 215, 215)
-restoreBtn.Parent = page2
-corner(restoreBtn, 6)
-
-local listBox = Instance.new("ScrollingFrame")
-listBox.Position = UDim2.fromOffset(14, 92)
-listBox.Size = UDim2.new(1, -28, 1, -122)
-listBox.BackgroundColor3 = Color3.fromRGB(13, 13, 13)
-listBox.BorderSizePixel = 0
-listBox.ScrollBarThickness = 4
-listBox.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 60)
-listBox.CanvasSize = UDim2.new(0, 0, 0, 0)
-listBox.AutomaticCanvasSize = Enum.AutomaticSize.Y
-listBox.ScrollingDirection = Enum.ScrollingDirection.Y
-listBox.Parent = page2
-corner(listBox, 6)
-
-local listLayout = Instance.new("UIListLayout", listBox)
-listLayout.Padding = UDim.new(0, 4)
-listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-local listPad = Instance.new("UIPadding", listBox)
-listPad.PaddingLeft = UDim.new(0, 4)
-listPad.PaddingRight = UDim.new(0, 4)
-listPad.PaddingTop = UDim.new(0, 4)
-
-local function addRow(part)
-    markedCount = markedCount + 1
-    local index = markedCount
-
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 30)
-    row.LayoutOrder = index
-    row.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
-    row.BorderSizePixel = 0
-    row.Parent = listBox
-
-    local name = Instance.new("TextLabel")
-    name.Size = UDim2.new(1, -66, 1, 0)
-    name.Position = UDim2.fromOffset(8, 0)
-    name.BackgroundTransparency = 1
-    name.Text = string.format("#%d  %s  %.1f×%.1f×%.1f", index, part.Name, part.Size.X, part.Size.Y, part.Size.Z)
-    name.Font = Enum.Font.SourceSans
-    name.TextSize = 10
-    name.TextColor3 = Color3.fromRGB(200, 200, 200)
-    name.TextXAlignment = Enum.TextXAlignment.Left
-    name.TextTruncate = Enum.TextTruncate.AtEnd
-    name.Parent = row
-
-    local view = Instance.new("TextButton")
-    view.Size = UDim2.fromOffset(50, 22)
-    view.Position = UDim2.new(1, -54, 0.5, -11)
-    view.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
-    view.BorderSizePixel = 0
-    view.AutoButtonColor = false
-    view.Text = "查看"
-    view.Font = Enum.Font.SourceSansBold
-    view.TextSize = 10
-    view.TextColor3 = Color3.fromRGB(210, 210, 210)
-    view.Parent = row
-    corner(view, 4)
-
-    view.MouseButton1Click:Connect(function()
-        if part.Parent then
-            viewPart(part)
-            say("已定位 #" .. index .. "，看屏幕上高亮的地方", true)
-        else
-            say("这块已经被删掉了", false)
-        end
-    end)
-
-    marked[part] = row
-end
-
-local function markPart(part)
-    if marked[part] then
-        say("这块已经在列表里了", nil)
-        return
-    end
-    if not part.CanCollide then
-        say("这块本来就是无碰撞的", nil)
-        return
-    end
-    part.CanCollide = false
-    addRow(part)
-    say("已加入列表，现在是第 " .. markedCount .. " 块", true)
-end
-
-viewToggle.MouseButton1Click:Connect(function()
-    if viewMode == "box" then
-        viewMode = "line"
-        viewToggle.Text = "查看方式：连线"
-    else
-        viewMode = "box"
-        viewToggle.Text = "查看方式：高亮"
-    end
-end)
-
-restoreBtn.MouseButton1Click:Connect(function()
-    local n = 0
-    for part, row in pairs(marked) do
-        if part.Parent then
-            part.CanCollide = true
-            n = n + 1
-        end
-        if row then row:Destroy() end
-    end
-    marked = {}
-    markedCount = 0
-    clearView()
-    say("已恢复 " .. n .. " 块", nil)
-end)
-
--- ===== 第 3 页：点方块读长宽高 =====
+-- ===== 第 2 页：点方块读长宽高 =====
 local lastSizePart = nil
 
 local sizeInfo = Instance.new("TextLabel")
@@ -1168,182 +1374,570 @@ local function showSize(part)
     say("读到了：" .. part.Name, true)
 end
 
--- ===== 第 4 页：空 =====
+-- ===== 第 3 页：高亮 ESP（2D 投影标签 + 轮廓 + 无限/NaN 血量）=====
+local espPage = page4
 
--- ===== 第 5 页：高亮 ESP（高亮 + 名字 + 血量 + 距离）=====
-local espPage = emptyPages[1]
-
-local espOn = false
-local espTracks = {}
-local espLast = 0
+local espOn = false         -- 轮廓高亮（Highlight），只管轮廓这一件事
+local espTextOn = false     -- 头顶文字
+local espBoxOn = false      -- 2D 方框，无数量上限
+local espSelfOn = false     -- 是否把玩家自己也算进去
+local espMute = {}          -- [player] = true 表示这个玩家的文字被禁用
+local espTargets = {}      -- [char] = { label = TextLabel }
+local espHl = {}           -- [char] = Highlight（受引擎 31 上限约束）
+local espLastScan = 0
 local espToggle = nil
-local espStat = nil
-local espUpdate = nil
+local ESP_MAX_HL = 31
+
+-- 标签不用 BillboardGui，改放 ScreenGui 里自己投影，永远不会被视口裁掉
+-- 老的一份先删掉，不然脚本跑两遍会叠两个 ESP 层
+local oldEsp = playerGui:FindFirstChild("ESP_Screen")
+if oldEsp then oldEsp:Destroy() end
+
+local espScreen = Instance.new("ScreenGui")
+espScreen.Name = "ESP_Screen"
+espScreen.IgnoreGuiInset = true
+espScreen.ResetOnSpawn = false
+espScreen.DisplayOrder = 5
+espScreen.Enabled = false
+espScreen.Parent = playerGui
+
+-- 取模型的世界坐标（优先 HumanoidRootPart，退到 GetPivot），两处共用
+local function modelWorldPos(m)
+    if not m then return Vector3.new(0, 0, 0) end
+    local r = m:FindFirstChild("HumanoidRootPart")
+    if r then return r.Position end
+    local ok, cf = pcall(function() return m:GetPivot() end)
+    if ok and cf then return cf.Position end
+    return Vector3.new(0, 0, 0)
+end
+
+-- 数字格式化：inf → 无限，NaN → NaN，有限值取整
+local function fmtNum(v)
+    if v ~= v then return "NaN" end
+    if v == math.huge then return "无限" end
+    if v == -math.huge then return "-无限" end
+    if v >= 1e13 then return "无限" end
+    return tostring(math.floor(v))
+end
+
+-- 只有 0 血及以下才红；NaN / 无限用中性色，正常血统一白色
+local function hpColor(hp, maxhp)
+    if hp == hp and hp <= 0 then
+        return Color3.fromRGB(255, 95, 95)
+    end
+    if hp ~= hp or hp == math.huge or hp == -math.huge then
+        return Color3.fromRGB(205, 210, 225)
+    end
+    return Color3.fromRGB(255, 255, 255)
+end
+
+-- 是不是“人形/怪物”模型：Humanoid 或有骨骼动画控制器，或带 Head 的 PrimaryPart 模型
+local function isCharModel(c)
+    if c:FindFirstChildOfClass("Humanoid") then return true end
+    if c:FindFirstChildOfClass("AnimationController") or c:FindFirstChildOfClass("Animator") then return true end
+    local head = c:FindFirstChild("Head")
+    if head and head:IsA("BasePart") and c.PrimaryPart then return true end
+    return false
+end
+
+-- 收集人形/怪物模型：workspace 顶层 + 往下钻三层文件夹 + 所有玩家角色
+local function collectChars()
+    local raw = {}
+    local function walk(container, depth)
+        for _, c in ipairs(container:GetChildren()) do
+            if c:IsA("Model") then
+                if isCharModel(c) then
+                    raw[#raw + 1] = c
+                end
+            elseif c:IsA("Folder") and depth > 0 then
+                walk(c, depth - 1)
+            end
+        end
+    end
+    walk(workspace, 3)
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character then raw[#raw + 1] = plr.Character end
+    end
+    local selfChar = nil
+    if not espSelfOn then
+        selfChar = player.Character
+    end
+    local seen, out = {}, {}
+    for _, m in ipairs(raw) do
+        if m ~= selfChar and not seen[m] then
+            seen[m] = true
+            out[#out + 1] = m
+        end
+    end
+    return out
+end
+
+-- 标签挂在哪个世界点：优先头顶，没有 Head 就退到根部
+local function charAnchor(char)
+    local head = char:FindFirstChild("Head")
+    if head and head:IsA("BasePart") then
+        return head.Position + Vector3.new(0, 1.05, 0)
+    end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local root = (hum and hum.RootPart) or char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart
+    if root and root:IsA("BasePart") then
+        return root.Position + Vector3.new(0, 2.1, 0)
+    end
+    -- 最后兜底：包围盒顶部，任何形状的怪物模型都能算出来
+    local ok, cf, size = pcall(function() return char:GetBoundingBox() end)
+    if ok and cf and size then
+        return cf.Position + Vector3.new(0, size.Y * 0.5 + 0.8, 0)
+    end
+    return nil
+end
 
 local function espClear()
-    for char, rec in pairs(espTracks) do
-        if rec.highlight then
-            pcall(function() rec.highlight:Destroy() end)
-        end
-        if rec.billboard then
-            pcall(function() rec.billboard:Destroy() end)
+    for _, rec in pairs(espTargets) do
+        if rec.label then pcall(function() rec.label:Destroy() end) end
+        if rec.box then pcall(function() rec.box:Destroy() end) end
+    end
+    espTargets = {}
+    for _, hl in pairs(espHl) do
+        if hl then pcall(function() hl:Destroy() end) end
+    end
+    espHl = {}
+end
+
+local function espScan()
+    local chars = collectChars()
+    local alive = {}
+    for _, m in ipairs(chars) do
+        alive[m] = true
+        if not espTargets[m] then
+            local lb = Instance.new("TextLabel")
+            lb.Name = "ESP_Tag"
+            lb.BackgroundTransparency = 1
+            lb.AnchorPoint = Vector2.new(0.5, 0.5)
+            lb.Size = UDim2.fromOffset(190, 58)
+            lb.Font = Enum.Font.SourceSansBold
+            lb.TextSize = 12
+            lb.TextWrapped = true
+            lb.TextColor3 = Color3.fromRGB(255, 255, 255)
+            lb.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+            lb.TextStrokeTransparency = 0.35
+            lb.Text = ""
+            lb.Visible = false
+            lb.Parent = espScreen
+
+            local bx = Instance.new("Frame")
+            bx.Name = "ESP_Box"
+            bx.BackgroundTransparency = 1
+            bx.Visible = false
+            bx.ZIndex = 1
+            bx.Parent = espScreen
+            local bs = Instance.new("UIStroke", bx)
+            bs.Thickness = 1.5
+            bs.Color = Color3.fromRGB(0, 210, 255)
+            bs.Transparency = 0
+
+            local owner = nil
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr.Character == m then
+                    owner = plr
+                    break
+                end
+            end
+            local rec = { label = lb, box = bx, stroke = bs, player = owner }
+
+            -- 包围盒记一次（0.3 秒刷新），之后每帧用 pivot 跟着走
+            local okB, bcf, bsize = pcall(function() return m:GetBoundingBox() end)
+            local okP, pcf = pcall(function() return m:GetPivot() end)
+            if okB and bcf and bsize and okP and pcf then
+                rec.size = bsize
+                rec.localCF = pcf:ToObjectSpace(bcf)
+            end
+
+            espTargets[m] = rec
         end
     end
-    espTracks = {}
+
+    -- 清掉已经消失 / 死透的角色
+    local dead = {}
+    for m in pairs(espTargets) do
+        if not alive[m] or not m.Parent then
+            dead[#dead + 1] = m
+        end
+    end
+    for _, m in ipairs(dead) do
+        local rec = espTargets[m]
+        if rec then
+            if rec.label then pcall(function() rec.label:Destroy() end) end
+            if rec.box then pcall(function() rec.box:Destroy() end) end
+        end
+        espTargets[m] = nil
+        local hl = espHl[m]
+        if hl then
+            pcall(function() hl:Destroy() end)
+            espHl[m] = nil
+        end
+    end
+
+    -- 每轮重算包围盒：怪物走动、骨骼动画变形时，2D 框能跟着走而不是钉在原地
+    for m, rec in pairs(espTargets) do
+        local okB, bcf, bsize = pcall(function() return m:GetBoundingBox() end)
+        local okP, pcf = pcall(function() return m:GetPivot() end)
+        if okB and bcf and bsize and okP and pcf then
+            rec.size = bsize
+            rec.localCF = pcf:ToObjectSpace(bcf)
+        else
+            rec.size = nil
+            rec.localCF = nil
+        end
+    end
+
+    -- 轮廓：引擎每个 MeshPart 最多 31 个 Highlight，按距离取最近的，表现稳定
+    local myPos = modelWorldPos(player.Character)
+    local near = {}
+    for m in pairs(espTargets) do
+        local wp = charAnchor(m)
+        if wp then
+            near[#near + 1] = { m = m, d = (wp - myPos).Magnitude }
+        end
+    end
+    table.sort(near, function(a, b) return a.d < b.d end)
+
+    -- 轮廓开关关掉时，只清轮廓，不动文字和方框
+    if not espOn then
+        for m in pairs(espHl) do
+            local hl = espHl[m]
+            if hl then pcall(function() hl:Destroy() end) end
+        end
+        espHl = {}
+        return
+    end
+
+    local wanted = {}
+    for i = 1, math.min(#near, ESP_MAX_HL) do
+        wanted[near[i].m] = true
+    end
+
+    for m in pairs(wanted) do
+        if not espHl[m] then
+            local hl = Instance.new("Highlight")
+            hl.Name = "ESP_Highlight"
+            hl.FillColor = Color3.fromRGB(0, 170, 255)
+            hl.FillTransparency = 0.45
+            hl.OutlineColor = Color3.fromRGB(0, 225, 255)
+            hl.OutlineTransparency = 0
+            pcall(function() hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop end)
+            hl.Parent = m
+            espHl[m] = hl
+        end
+    end
+
+    local drop = {}
+    for m in pairs(espHl) do
+        if not wanted[m] or not m.Parent then drop[#drop + 1] = m end
+    end
+    for _, m in ipairs(drop) do
+        local hl = espHl[m]
+        if hl then pcall(function() hl:Destroy() end) end
+        espHl[m] = nil
+    end
 end
 
-local function espAdd(char, head, hum)
-    local hl = Instance.new("Highlight")
-    hl.Name = "ESP_Highlight"
-    hl.FillColor = Color3.fromRGB(0, 170, 255)
-    hl.FillTransparency = 0.45
-    hl.OutlineColor = Color3.fromRGB(0, 225, 255)
-    hl.OutlineTransparency = 0
-    pcall(function() hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop end)
-    hl.Parent = char
-
-    local bb = Instance.new("BillboardGui")
-    bb.Name = "ESP_Tag"
-    bb.Size = UDim2.fromOffset(180, 56)
-    bb.StudsOffset = Vector3.new(0, 2.6, 0)
-    bb.AlwaysOnTop = true
-    bb.LightInfluence = 0
-    bb.MaxDistance = 600
-    bb.Adornee = head
-    bb.Parent = head
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.fromScale(1, 1)
-    label.BackgroundTransparency = 1
-    label.Text = ""
-    label.Font = Enum.Font.SourceSansBold
-    label.TextSize = 12
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.TextStrokeTransparency = 0.3
-    label.TextWrapped = true
-    label.TextXAlignment = Enum.TextXAlignment.Center
-    label.TextYAlignment = Enum.TextYAlignment.Center
-    label.Parent = bb
-
-    espTracks[char] = { highlight = hl, billboard = bb, label = label }
-end
-
-espUpdate = function()
+local function espRender()
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local vp = cam.ViewportSize
     local myChar = player.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    local myPos = myRoot and myRoot.Position or Vector3.new(0, 0, 0)
+    local myPos = modelWorldPos(myChar)
 
-    -- 清掉已经没了的角色
-    for char, rec in pairs(espTracks) do
-        if not char.Parent or not char:FindFirstChildOfClass("Humanoid") then
-            if rec.highlight then pcall(function() rec.highlight:Destroy() end) end
-            if rec.billboard then pcall(function() rec.billboard:Destroy() end) end
-            espTracks[char] = nil
-        end
-    end
-
-    -- 新增角色（顶层模型 + 所有玩家角色）
-    local seen = {}
-    local function consider(m)
-        if seen[m] then return end
-        seen[m] = true
-        if espTracks[m] then return end
+    for m, rec in pairs(espTargets) do
+        local lb = rec.label
         local hum = m:FindFirstChildOfClass("Humanoid")
-        local head = m:FindFirstChild("Head")
-        if hum and head then
-            espAdd(m, head, hum)
-        end
-    end
-
-    for _, c in ipairs(workspace:GetChildren()) do
-        if c:IsA("Model") and c:FindFirstChildOfClass("Humanoid") then
-            consider(c)
-        end
-    end
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr.Character then
-            consider(plr.Character)
-        end
-    end
-
-    -- 刷新文字：名字 / 血量 / 距离 studs
-    local counted = 0
-    for char, rec in pairs(espTracks) do
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
-        if hum and rec.label and root then
-            counted = counted + 1
-            local nm = hum.DisplayName
-            if not nm or nm == "" then nm = char.Name end
-            local hp = math.max(0, math.floor(hum.Health))
-            local maxhp = math.max(1, math.floor(hum.MaxHealth))
-            local dist = math.floor((root.Position - myPos).Magnitude)
-            rec.label.Text = nm .. "\n" .. hp .. "/" .. maxhp .. "\n" .. dist .. " studs"
-
-            local ratio = hp / maxhp
-            if ratio > 0.6 then
-                rec.label.TextColor3 = Color3.fromRGB(120, 240, 150)
-            elseif ratio > 0.3 then
-                rec.label.TextColor3 = Color3.fromRGB(255, 220, 110)
+        local wp = charAnchor(m)
+        if lb and wp then
+            local sp = cam:WorldToViewportPoint(wp)
+            local muted = rec.player and espMute[rec.player]
+            if sp.Z <= 1 or not espTextOn or muted then
+                lb.Visible = false
             else
-                rec.label.TextColor3 = Color3.fromRGB(255, 110, 110)
+                local x, y = sp.X, sp.Y
+                local padX, padY = 60, 34
+                local edge = false
+                if x < padX then x = padX; edge = true
+                elseif x > vp.X - padX then x = vp.X - padX; edge = true end
+                if y < padY then y = padY; edge = true
+                elseif y > vp.Y - padY then y = vp.Y - padY; edge = true end
+
+                lb.Visible = true
+                lb.Position = UDim2.fromOffset(math.floor(x), math.floor(y))
+
+                local dxz = Vector2.new(wp.X - myPos.X, wp.Z - myPos.Z).Magnitude
+                local nm = m.Name
+                local hpStr = "无血量数据"
+                local col = Color3.fromRGB(205, 210, 225)
+                if hum then
+                    if hum.DisplayName and hum.DisplayName ~= "" then nm = hum.DisplayName end
+                    hpStr = fmtNum(hum.Health) .. " / " .. fmtNum(hum.MaxHealth)
+                    col = hpColor(hum.Health, hum.MaxHealth)
+                end
+                if m == myChar then col = Color3.fromRGB(150, 220, 255) end
+
+                lb.Text = nm .. "\n" .. hpStr .. "\n" .. tostring(math.floor(dxz)) .. " studs"
+                lb.TextColor3 = col
+                lb.TextTransparency = edge and 0.3 or 0
+                lb.TextSize = (dxz > 700) and 10 or 12
+            end
+        elseif lb then
+            lb.Visible = false
+        end
+
+        -- 方框模式：投影包围盒 8 个角，算出屏幕矩形
+        local box = rec.box
+        if box then
+            if espBoxOn and rec.size and rec.localCF then
+                local okP, pcf = pcall(function() return m:GetPivot() end)
+                local shownBox = false
+                if okP and pcf then
+                    local bcf = pcf * rec.localCF
+                    local sz = rec.size
+                    local minX, minY = math.huge, math.huge
+                    local maxX, maxY = -math.huge, -math.huge
+                    for ix = -1, 1, 2 do
+                        for iy = -1, 1, 2 do
+                            for iz = -1, 1, 2 do
+                                local wpt = bcf * Vector3.new(sz.X * 0.5 * ix, sz.Y * 0.5 * iy, sz.Z * 0.5 * iz)
+                                local sp2 = cam:WorldToViewportPoint(wpt)
+                                if sp2.Z > 0 then
+                                    shownBox = true
+                                    if sp2.X < minX then minX = sp2.X end
+                                    if sp2.Y < minY then minY = sp2.Y end
+                                    if sp2.X > maxX then maxX = sp2.X end
+                                    if sp2.Y > maxY then maxY = sp2.Y end
+                                end
+                            end
+                        end
+                    end
+                    if shownBox then
+                        minX = math.max(0, minX)
+                        minY = math.max(0, minY)
+                        maxX = math.min(vp.X, maxX)
+                        maxY = math.min(vp.Y, maxY)
+                        local w, h = maxX - minX, maxY - minY
+                        if w >= 2 and h >= 2 then
+                            box.Visible = true
+                            box.Position = UDim2.fromOffset(math.floor(minX), math.floor(minY))
+                            box.Size = UDim2.fromOffset(math.floor(w), math.floor(h))
+                            if rec.stroke then
+                                if rec.player and espMute[rec.player] then
+                                    rec.stroke.Color = Color3.fromRGB(120, 120, 120)
+                                else
+                                    rec.stroke.Color = Color3.fromRGB(0, 210, 255)
+                                end
+                            end
+                        else
+                            box.Visible = false
+                        end
+                    else
+                        box.Visible = false
+                    end
+                else
+                    box.Visible = false
+                end
+            else
+                box.Visible = false
             end
         end
     end
 
-    if espStat then
-        espStat.Text = "已标记 " .. counted .. " 个角色"
-    end
 end
 
-espToggle = makeToggle(espPage, 12, "高亮 ESP", function(state)
+
+-- 先声明，两个勾选框要互相取消，闭包得先拿到对方
+local espBoxToggle = nil
+
+local function clearEspHighlights()
+    for m in pairs(espHl) do
+        local hl = espHl[m]
+        if hl then pcall(function() hl:Destroy() end) end
+    end
+    espHl = {}
+end
+
+espToggle = makeCheckRow(espPage, 14, 12, 148, "高亮 ESP", function(state)
     espOn = state
-    if espOn then
-        if espUpdate then espUpdate() end
+    if state then
+        espLastScan = 0
+        pcall(espScan)
+        pcall(espRender)
     else
-        espClear()
-        if espStat then espStat.Text = "已关闭" end
+        clearEspHighlights()
     end
 end)
 
-espStat = Instance.new("TextLabel")
-espStat.Position = UDim2.fromOffset(14, 68)
-espStat.Size = UDim2.new(1, -28, 0, 18)
-espStat.BackgroundTransparency = 1
-espStat.Text = "已关闭"
-espStat.Font = Enum.Font.SourceSans
-espStat.TextSize = 11
-espStat.TextColor3 = Color3.fromRGB(140, 140, 140)
-espStat.TextXAlignment = Enum.TextXAlignment.Left
-espStat.Parent = espPage
+local espTextToggle = makeToggleAt(espPage, 168, 12, 148, "显示文字", function(state)
+    espTextOn = state
+    espScreen.Enabled = (espTextOn or espBoxOn)
+    if state then
+        espLastScan = 0
+    else
+        for _, rec in pairs(espTargets) do
+            if rec.label then rec.label.Visible = false end
+        end
+    end
+end)
 
-local espHint = Instance.new("TextLabel")
-espHint.Position = UDim2.fromOffset(14, 92)
-espHint.Size = UDim2.new(1, -28, 0, 46)
-espHint.BackgroundTransparency = 1
-espHint.Text = "高亮所有人形模型，头顶显示名字、血量、离你多少 studs。每 0.25 秒刷新一次；死亡、退出、重生的角色会自动处理。"
-espHint.Font = Enum.Font.SourceSans
-espHint.TextSize = 10
-espHint.TextColor3 = Color3.fromRGB(120, 120, 120)
-espHint.TextWrapped = true
-espHint.TextXAlignment = Enum.TextXAlignment.Left
-espHint.TextYAlignment = Enum.TextYAlignment.Top
-espHint.Parent = espPage
+espBoxToggle = makeCheckRow(espPage, 14, 60, 148, "方框 ESP", function(state)
+    espBoxOn = state
+    espScreen.Enabled = (espTextOn or espBoxOn)
+    if state then
+        espLastScan = 0
+    else
+        for _, rec in pairs(espTargets) do
+            if rec.box then rec.box.Visible = false end
+        end
+    end
+end)
+
+local espSelfToggle = makeToggleAt(espPage, 168, 60, 148, "显示玩家自身", function(state)
+    espSelfOn = state
+    espLastScan = 0
+    if not state then
+        local mc = player.Character
+        local rec = mc and espTargets[mc]
+        if rec then
+            if rec.label then pcall(function() rec.label:Destroy() end) end
+            if rec.box then pcall(function() rec.box:Destroy() end) end
+            espTargets[mc] = nil
+            local hl = espHl[mc]
+            if hl then
+                pcall(function() hl:Destroy() end)
+                espHl[mc] = nil
+            end
+        end
+    end
+end)
+
+-- ===== 禁用指定玩家的文字 =====
+local muteDrop = nil
+local dropLayout = nil
+local rebuildMuteList = nil
+local muteToggleBtn = nil
+
+local function makeFlatButton(parent, x, y, w, h, text, onClick)
+    local btn = Instance.new("TextButton")
+    btn.Position = UDim2.fromOffset(x, y)
+    btn.Size = UDim2.fromOffset(w, h)
+    btn.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
+    btn.Text = text
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 11
+    btn.TextColor3 = Color3.fromRGB(225, 225, 225)
+    btn.TextTruncate = Enum.TextTruncate.AtEnd
+    btn.ZIndex = 2
+    btn.Parent = parent
+    corner(btn, 6)
+    btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(34, 34, 34) end)
+    btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(26, 26, 26) end)
+    btn.MouseButton1Click:Connect(function() if onClick then onClick() end end)
+    return btn
+end
+
+makeFlatButton(espPage, 14, 108, 148, 32, "全部禁用文字", function()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        espMute[plr] = true
+    end
+    if rebuildMuteList then pcall(rebuildMuteList) end
+end)
+
+makeFlatButton(espPage, 168, 108, 148, 32, "全部恢复文字", function()
+    espMute = {}
+    if rebuildMuteList then pcall(rebuildMuteList) end
+end)
+
+muteToggleBtn = makeFlatButton(espPage, 14, 144, 303, 32, "选择玩家禁用 ▾", function()
+    if not muteDrop then return end
+    muteDrop.Visible = not muteDrop.Visible
+    if muteDrop.Visible then
+        muteToggleBtn.Text = "选择玩家禁用 ▴"
+        if rebuildMuteList then pcall(rebuildMuteList) end
+    else
+        muteToggleBtn.Text = "选择玩家禁用 ▾"
+    end
+end)
+
+muteDrop = Instance.new("ScrollingFrame")
+muteDrop.Position = UDim2.fromOffset(14, 180)
+muteDrop.Size = UDim2.new(1, -28, 0, 96)
+muteDrop.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
+muteDrop.BorderSizePixel = 0
+muteDrop.ScrollBarThickness = 4
+muteDrop.ScrollBarImageColor3 = Color3.fromRGB(90, 90, 90)
+muteDrop.CanvasSize = UDim2.new(0, 0, 0, 0)
+muteDrop.Visible = false
+muteDrop.ZIndex = 6
+pcall(function() muteDrop.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
+muteDrop.Parent = espPage
+corner(muteDrop, 6)
+
+dropLayout = Instance.new("UIListLayout")
+dropLayout.Padding = UDim.new(0, 1)
+dropLayout.SortOrder = Enum.SortOrder.LayoutOrder
+dropLayout.Parent = muteDrop
+
+rebuildMuteList = function()
+    for _, c in ipairs(muteDrop:GetChildren()) do
+        if c:IsA("TextButton") or c:IsA("TextLabel") then c:Destroy() end
+    end
+    local plrs = Players:GetPlayers()
+    if #plrs == 0 then
+        local empty = Instance.new("TextLabel")
+        empty.Size = UDim2.new(1, 0, 0, 26)
+        empty.BackgroundTransparency = 1
+        empty.Text = "当前没有其他玩家"
+        empty.Font = Enum.Font.SourceSans
+        empty.TextSize = 11
+        empty.TextColor3 = Color3.fromRGB(110, 110, 110)
+        empty.ZIndex = 7
+        empty.Parent = muteDrop
+        return
+    end
+    for i, plr in ipairs(plrs) do
+        local row = Instance.new("TextButton")
+        row.Size = UDim2.new(1, 0, 0, 26)
+        row.LayoutOrder = i
+        row.BackgroundColor3 = espMute[plr] and Color3.fromRGB(40, 24, 24) or Color3.fromRGB(24, 24, 24)
+        row.BorderSizePixel = 0
+        row.AutoButtonColor = false
+        row.Text = (espMute[plr] and "✕ " or "· ") .. plr.DisplayName
+        row.Font = Enum.Font.SourceSansBold
+        row.TextSize = 11
+        row.TextColor3 = espMute[plr] and Color3.fromRGB(255, 130, 130) or Color3.fromRGB(200, 200, 200)
+        row.TextXAlignment = Enum.TextXAlignment.Left
+        row.ZIndex = 7
+        row.Parent = muteDrop
+        local pad = Instance.new("UIPadding", row)
+        pad.PaddingLeft = UDim.new(0, 10)
+        row.MouseButton1Click:Connect(function()
+            espMute[plr] = (not espMute[plr]) and true or nil
+            rebuildMuteList()
+        end)
+    end
+end
+
 
 RunService.Heartbeat:Connect(function()
-    if not espOn then return end
+    if not espOn and not espTextOn and not espBoxOn then return end
     local now = os.clock()
-    if now - espLast < 0.25 then return end
-    espLast = now
-    if espUpdate then espUpdate() end
+    if now - espLastScan >= 0.3 then
+        espLastScan = now
+        pcall(espScan)
+    end
+    pcall(espRender)
 end)
 
 
 setPicking = function(mode, quiet)
     picking = mode
-    if pickBtn then
-        pickBtn.Text = (mode == "mark") and "点窗口外任意方块（点这里取消）" or "点我开始选方块（变无碰撞）"
-    end
     if sizeBtn then
         sizeBtn.Text = (mode == "size") and "点窗口外任意方块（点这里取消）" or "点我选一块方块（读长宽高）"
     end
@@ -1355,14 +1949,6 @@ setPicking = function(mode, quiet)
         end
     end
 end
-
-pickBtn.MouseButton1Click:Connect(function()
-    if picking == "mark" then
-        setPicking(nil)
-    else
-        setPicking("mark")
-    end
-end)
 
 cancelPick = function()
     if picking then setPicking(nil, true) end
@@ -1390,11 +1976,7 @@ UIS.InputBegan:Connect(function(input)
         return
     end
 
-    if picking == "mark" then
-        markPart(part)
-    else
-        showSize(part)
-    end
+    showSize(part)
     setPicking(nil, true)
 end)
 setPage(1)
@@ -1418,6 +2000,11 @@ end
 
 local function beginDrag(input)
     if dragging then return end
+    -- 最小化/展开动画还在跑就先全部停掉，不然拖着会跟补间打架
+    for obj in pairs(minTweens) do
+        pcall(function() minTweens[obj]:Cancel() end)
+    end
+    minTweens = {}
     dragging = true
     dragInput = input
     dragTouch = (input.UserInputType == Enum.UserInputType.Touch) and input or nil
@@ -1490,6 +2077,10 @@ Cleanup.run = function()
         if flying and setFly then setFly(false) end
     end)
     pcall(function()
+        if walkAirOn and setWalkAir then setWalkAir(false) end
+        if walkAirToggle then walkAirToggle.Set(false, true) end
+    end)
+    pcall(function()
         if noclipOn and setNoclip then setNoclip(false) end
     end)
     pcall(function()
@@ -1507,7 +2098,18 @@ Cleanup.run = function()
     pcall(function()
         if setPicking then setPicking(nil, true) end
     end)
-    pcall(function() clearView() end)
-    pcall(function() espOn = false; espClear() end)
+    pcall(function()
+        espOn = false
+        espTextOn = false
+        espBoxOn = false
+        espSelfOn = false
+        espClear()
+        espScreen.Enabled = false
+        if espToggle then espToggle.Set(false, true) end
+        if espTextToggle then espTextToggle.Set(false, true) end
+        if espBoxToggle then espBoxToggle.Set(false, true) end
+        if espSelfToggle then espSelfToggle.Set(false, true) end
+        if espScreen and espScreen.Parent then pcall(function() espScreen:Destroy() end) end
+    end)
     FLY_SPEED = 40
 end
