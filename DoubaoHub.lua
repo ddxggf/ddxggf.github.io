@@ -1345,7 +1345,12 @@ local function teardownWalkAir()
     if walkAtt then pcall(function() walkAtt:Destroy() end); walkAtt = nil end
     local char = player.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true) end) end
+    if hum then
+        pcall(function()
+            hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+        end)
+    end
     walkLockY = nil
 end
 
@@ -1371,16 +1376,20 @@ setWalkAir = function(on, quiet)
             walkAlign.Name = "WalkAirAlign"
             walkAlign.Mode = Enum.PositionAlignmentMode.OneAttachment
             walkAlign.Attachment0 = walkAtt
-            walkAlign.MaxForce = 200000
-            walkAlign.Responsiveness = 60
-            walkAlign.ApplyAtCenterOfMass = true
+            walkAlign.MaxForce = 4000
+            walkAlign.Responsiveness = 25
+            walkAlign.ApplyAtCenterOfMass = false
             walkAlign.Position = root.Position
             walkAlign.Parent = walkAtt
         end
 
-        -- 关掉"自由落体"状态：脚下没东西也能算站在地上，这样还能跳
+        -- 关掉"自由落体"和"摔倒"：脚下没东西也算站在地上（能跳），
+        -- 且不会被引擎判定成跌倒而翻倒旋转
         if hum then
-            pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false) end)
+            pcall(function()
+                hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+                hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+            end)
         end
 
         walkAirConn = RunService.Stepped:Connect(function()
@@ -1398,14 +1407,26 @@ setWalkAir = function(on, quiet)
 
             -- 往上跳就跟着抬（可以升高），往下不给降
             local v = r.AssemblyLinearVelocity
+            local st = h and h:GetState()
             local y = walkLockY or r.Position.Y
-            if v.Y > 1 and r.Position.Y > y then y = r.Position.Y end
+
+            if v.Y > 2 or st == Enum.HumanoidStateType.Jumping then
+                if r.Position.Y > y then y = r.Position.Y end
+            end
+
+            -- 被外力推得太远就别硬拉，重新以当前位置为准，防止越拉越高
+            if math.abs(y - r.Position.Y) > 12 then
+                y = r.Position.Y
+            end
             walkLockY = y
 
             walkAlign.Position = Vector3.new(r.Position.X, y, r.Position.Z)
 
-            if h and h:GetState() == Enum.HumanoidStateType.Freefall then
-                pcall(function() h:ChangeState(Enum.HumanoidStateType.Running) end)
+            if h then
+                local s2 = h:GetState()
+                if s2 == Enum.HumanoidStateType.Freefall or s2 == Enum.HumanoidStateType.FallingDown then
+                    pcall(function() h:ChangeState(Enum.HumanoidStateType.Running) end)
+                end
             end
         end)
     end
@@ -2134,18 +2155,6 @@ local function makeFlatButton(parent, x, y, w, h, text, onClick)
     btn.MouseButton1Click:Connect(function() if onClick then onClick() end end)
     return btn
 end
-
-makeFlatButton(espPage, 14, 108, 148, 32, "全部禁用文字", function()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        espMute[plr] = true
-    end
-    if rebuildMuteList then pcall(rebuildMuteList) end
-end)
-
-makeFlatButton(espPage, 168, 108, 148, 32, "全部恢复文字", function()
-    espMute = {}
-    if rebuildMuteList then pcall(rebuildMuteList) end
-end)
 
 muteToggleBtn = makeFlatButton(espPage, 14, 144, 303, 32, "选择玩家禁用 ▾", function()
     if not muteDrop then return end
