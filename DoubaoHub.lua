@@ -148,7 +148,7 @@ mini.AnchorPoint = Vector2.new(0, 0.5)
 mini.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mini.BorderSizePixel = 0
 mini.AutoButtonColor = false
-mini.Text = "—"
+mini.Text = "-"
 mini.Font = Enum.Font.SourceSansBold
 mini.TextSize = 16
 mini.TextColor3 = Color3.fromRGB(160, 160, 160)
@@ -2037,14 +2037,14 @@ local function makeFlatButton(parent, x, y, w, h, text, onClick)
     return btn
 end
 
-muteToggleBtn = makeFlatButton(espPage, 14, 144, 303, 32, "选择玩家禁用 ▾", function()
+muteToggleBtn = makeFlatButton(espPage, 14, 144, 303, 32, "选择玩家禁用 v", function()
     if not muteDrop then return end
     muteDrop.Visible = not muteDrop.Visible
     if muteDrop.Visible then
-        muteToggleBtn.Text = "选择玩家禁用 ▴"
+        muteToggleBtn.Text = "选择玩家禁用 ^"
         if rebuildMuteList then pcall(rebuildMuteList) end
     else
-        muteToggleBtn.Text = "选择玩家禁用 ▾"
+        muteToggleBtn.Text = "选择玩家禁用 v"
     end
 end)
 
