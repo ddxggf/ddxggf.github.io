@@ -38,92 +38,204 @@ pcall(function()
     sg.Name = "DoubaoSplash"
     sg.IgnoreGuiInset = true
     sg.ResetOnSpawn = false
-    sg.DisplayOrder = 100
+    sg.DisplayOrder = 200
     sg.Parent = playerGui
+
+    local T = TweenService
+    local OUTQ = Enum.EasingDirection.Out
+    local QUI = Enum.EasingStyle.Quint
 
     local bg = Instance.new("Frame")
     bg.Size = UDim2.fromScale(1, 1)
-    bg.BackgroundColor3 = Color3.fromRGB(5, 7, 11)
+    bg.BackgroundColor3 = Color3.fromRGB(4, 6, 10)
     bg.BackgroundTransparency = 1
     bg.BorderSizePixel = 0
     bg.Parent = sg
 
+    -- 一圈描边，从满屏收拢到内容大小
+    local ring = Instance.new("Frame")
+    ring.AnchorPoint = Vector2.new(0.5, 0.5)
+    ring.Position = UDim2.fromScale(0.5, 0.5)
+    ring.Size = UDim2.fromScale(1, 1)
+    ring.BackgroundTransparency = 1
+    ring.BorderSizePixel = 0
+    ring.ZIndex = 2
+    ring.Parent = bg
+    corner(ring, 14)
+    local ringStroke = Instance.new("UIStroke")
+    ringStroke.Color = Color3.fromRGB(60, 140, 255)
+    ringStroke.Thickness = 1
+    ringStroke.Transparency = 1
+    ringStroke.Parent = ring
+
+    local strokes = {}
+    local function outline(lbl, th)
+        local st = Instance.new("UIStroke")
+        st.Color = Color3.fromRGB(8, 10, 16)
+        st.Thickness = th or 2
+        st.Transparency = 0.1
+        st.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+        st.Parent = lbl
+        strokes[#strokes + 1] = st
+    end
+
     local title = Instance.new("TextLabel")
     title.AnchorPoint = Vector2.new(0.5, 0.5)
-    title.Position = UDim2.fromScale(0.5, 0.46)
-    title.Size = UDim2.fromOffset(360, 56)
+    title.Position = UDim2.fromScale(0.5, 0.44)
+    title.Size = UDim2.fromOffset(400, 72)
     title.BackgroundTransparency = 1
     title.Text = "豆包中心"
     title.Font = Enum.Font.SourceSansBold
-    title.TextSize = 42
-    title.TextColor3 = Color3.fromRGB(238, 245, 255)
+    title.TextSize = 20
+    title.TextColor3 = Color3.fromRGB(240, 246, 255)
     title.TextTransparency = 1
-    title.ZIndex = 2
+    title.ZIndex = 3
     title.Parent = bg
+    outline(title, 2.5)
 
     local glow = Instance.new("Frame")
     glow.AnchorPoint = Vector2.new(0.5, 0.5)
-    glow.Position = UDim2.fromScale(0.5, 0.53)
+    glow.Position = UDim2.fromScale(0.5, 0.545)
     glow.Size = UDim2.fromOffset(0, 2)
     glow.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
     glow.BorderSizePixel = 0
     glow.ZIndex = 3
     glow.Parent = bg
 
+    local en = Instance.new("TextLabel")
+    en.AnchorPoint = Vector2.new(0.5, 0.5)
+    en.Position = UDim2.fromScale(0.5, 0.585)
+    en.Size = UDim2.fromOffset(360, 16)
+    en.BackgroundTransparency = 1
+    en.Text = "DOUBAO Hub"
+    en.Font = Enum.Font.SourceSansSemibold
+    en.TextSize = 11
+    en.TextColor3 = Color3.fromRGB(165, 205, 255)
+    en.TextTransparency = 1
+    en.ZIndex = 3
+    en.Parent = bg
+    outline(en, 1.5)
+
     local sub = Instance.new("TextLabel")
     sub.AnchorPoint = Vector2.new(0.5, 0.5)
-    sub.Position = UDim2.fromScale(0.5, 0.58)
+    sub.Position = UDim2.fromScale(0.5, 0.645)
     sub.Size = UDim2.fromOffset(300, 20)
     sub.BackgroundTransparency = 1
     sub.Text = "正在载入面板…"
     sub.Font = Enum.Font.SourceSans
     sub.TextSize = 13
-    sub.TextColor3 = Color3.fromRGB(150, 160, 180)
+    sub.TextColor3 = Color3.fromRGB(214, 224, 240)
     sub.TextTransparency = 1
+    sub.ZIndex = 3
     sub.Parent = bg
+    outline(sub, 1.5)
 
     local barBg = Instance.new("Frame")
     barBg.AnchorPoint = Vector2.new(0.5, 0.5)
-    barBg.Position = UDim2.fromScale(0.5, 0.65)
-    barBg.Size = UDim2.fromOffset(220, 3)
-    barBg.BackgroundColor3 = Color3.fromRGB(30, 34, 44)
+    barBg.Position = UDim2.fromScale(0.5, 0.715)
+    barBg.Size = UDim2.fromOffset(260, 4)
+    barBg.BackgroundColor3 = Color3.fromRGB(24, 28, 36)
+    barBg.BackgroundTransparency = 1
     barBg.BorderSizePixel = 0
+    barBg.ZIndex = 3
     barBg.Parent = bg
     corner(barBg, 2)
 
     local bar = Instance.new("Frame")
-    bar.Size = UDim2.fromOffset(0, 3)
-    bar.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
+    bar.Size = UDim2.fromOffset(0, 4)
+    bar.BackgroundColor3 = Color3.fromRGB(70, 150, 255)
     bar.BorderSizePixel = 0
+    bar.ZIndex = 4
     bar.Parent = barBg
     corner(bar, 2)
 
+    local pct = Instance.new("TextLabel")
+    pct.AnchorPoint = Vector2.new(0, 0.5)
+    pct.Position = UDim2.new(1, 10, 0.5, 0)
+    pct.Size = UDim2.fromOffset(46, 16)
+    pct.BackgroundTransparency = 1
+    pct.Text = "0%"
+    pct.Font = Enum.Font.SourceSansSemibold
+    pct.TextSize = 11
+    pct.TextColor3 = Color3.fromRGB(180, 215, 255)
+    pct.TextXAlignment = Enum.TextXAlignment.Left
+    pct.TextTransparency = 1
+    pct.ZIndex = 4
+    pct.Parent = barBg
+    outline(pct, 1.5)
+
     local scan = Instance.new("Frame")
-    scan.Size = UDim2.new(1, 0, 0, 1)
-    scan.Position = UDim2.fromScale(0, 0)
-    scan.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
-    scan.BackgroundTransparency = 0.75
+    scan.Size = UDim2.new(1, 0, 0, 120)
+    scan.Position = UDim2.fromScale(0, -0.22)
+    scan.BackgroundColor3 = Color3.fromRGB(120, 190, 255)
+    scan.BackgroundTransparency = 0.9
     scan.BorderSizePixel = 0
+    scan.ZIndex = 5
     scan.Parent = bg
 
-    local T = TweenService
-    T:Create(bg, TweenInfo.new(0.25), { BackgroundTransparency = 0.12 }):Play()
-    T:Create(title, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0.1), { TextTransparency = 0 }):Play()
-    T:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0.22), { Size = UDim2.fromOffset(200, 2) }):Play()
-    T:Create(sub, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0.38), { TextTransparency = 0 }):Play()
-    T:Create(bar, TweenInfo.new(1.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0.3), { Size = UDim2.fromOffset(220, 3) }):Play()
-    T:Create(scan, TweenInfo.new(2.3, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0.2), { Position = UDim2.fromScale(0, 1) }):Play()
+    -- ① 0.25 描边亮起 + 收拢
+    task.delay(0.25, function()
+        T:Create(ringStroke, TweenInfo.new(1.0, QUI, OUTQ), { Transparency = 0.35 }):Play()
+        T:Create(ring, TweenInfo.new(1.15, QUI, OUTQ), { Size = UDim2.fromScale(0.88, 0.68) }):Play()
+    end)
 
-    task.delay(2.65, function()
-        local out = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-        T:Create(bg, out, { BackgroundTransparency = 1 }):Play()
-        T:Create(title, out, { TextTransparency = 1 }):Play()
-        T:Create(sub, out, { TextTransparency = 1 }):Play()
-        T:Create(glow, out, { BackgroundTransparency = 1 }):Play()
-        T:Create(barBg, out, { BackgroundTransparency = 1 }):Play()
-        T:Create(bar, out, { BackgroundTransparency = 1 }):Play()
-        T:Create(scan, out, { BackgroundTransparency = 1 }):Play()
-        task.delay(0.4, function()
+    -- ② 0.75 标题放大浮现
+    task.delay(0.75, function()
+        T:Create(title, TweenInfo.new(0.7, Enum.EasingStyle.Back, OUTQ), { TextSize = 52 }):Play()
+        T:Create(title, TweenInfo.new(0.5), { TextTransparency = 0 }):Play()
+    end)
+
+    -- ③ 1.15 蓝线展开
+    task.delay(1.15, function()
+        T:Create(glow, TweenInfo.new(0.6, QUI, OUTQ), { Size = UDim2.fromOffset(260, 2) }):Play()
+    end)
+
+    -- ④ 1.30 英文小标 + 副标题
+    task.delay(1.3, function()
+        T:Create(en, TweenInfo.new(0.4), { TextTransparency = 0.2 }):Play()
+    end)
+    task.delay(1.45, function()
+        T:Create(sub, TweenInfo.new(0.4), { TextTransparency = 0 }):Play()
+    end)
+
+    -- ⑤ 1.60 进度条 + 百分比往上爬（2.4 秒走完）
+    task.delay(1.6, function()
+        T:Create(barBg, TweenInfo.new(0.35), { BackgroundTransparency = 0 }):Play()
+        T:Create(pct, TweenInfo.new(0.35), { TextTransparency = 0 }):Play()
+        T:Create(bar, TweenInfo.new(2.4, QUI, OUTQ), { Size = UDim2.fromOffset(260, 4) }):Play()
+        task.spawn(function()
+            local t0 = os.clock()
+            while os.clock() - t0 < 2.4 do
+                local k = math.clamp((os.clock() - t0) / 2.4, 0, 1)
+                pcall(function() pct.Text = tostring(math.floor(k * 100)) .. "%" end)
+                task.wait(0.05)
+            end
+            pcall(function() pct.Text = "100%" end)
+        end)
+    end)
+
+    -- ⑥ 4.10 一条亮带从上扫到下面
+    task.delay(4.1, function()
+        T:Create(scan, TweenInfo.new(0.62, Enum.EasingStyle.Linear), { Position = UDim2.fromScale(0, 1.1) }):Play()
+    end)
+
+    -- ⑦ 4.45 直接淡出，不打白闪
+    task.delay(4.45, function()
+        local o = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        T:Create(bg, o, { BackgroundTransparency = 1 }):Play()
+        T:Create(ringStroke, o, { Transparency = 1 }):Play()
+        T:Create(title, o, { TextTransparency = 1 }):Play()
+        T:Create(en, o, { TextTransparency = 1 }):Play()
+        T:Create(sub, o, { TextTransparency = 1 }):Play()
+        T:Create(pct, o, { TextTransparency = 1 }):Play()
+        T:Create(glow, o, { BackgroundTransparency = 1 }):Play()
+        T:Create(barBg, o, { BackgroundTransparency = 1 }):Play()
+        T:Create(bar, o, { BackgroundTransparency = 1 }):Play()
+        T:Create(scan, o, { BackgroundTransparency = 1 }):Play()
+        for _, st in ipairs(strokes) do
+            pcall(function() T:Create(st, o, { Transparency = 1 }):Play() end)
+        end
+        task.delay(0.5, function()
             pcall(function() sg:Destroy() end)
         end)
     end)
@@ -352,9 +464,16 @@ pages.BorderSizePixel = 0
 pages.Active = true
 pages.Parent = win
 
-local page1 = Instance.new("Frame")
-page1.Size = UDim2.fromScale(1, 1)
+local page1 = Instance.new("ScrollingFrame")
+page1.Size = UDim2.new(1, 0, 1, -26)
 page1.BackgroundTransparency = 1
+page1.BorderSizePixel = 0
+page1.ScrollBarThickness = 6
+page1.ScrollBarImageColor3 = Color3.fromRGB(74, 78, 90)
+page1.ScrollBarImageTransparency = 0.15
+page1.CanvasSize = UDim2.fromOffset(0, 0)
+page1.AutomaticCanvasSize = Enum.AutomaticSize.Y
+page1.ScrollingDirection = Enum.ScrollingDirection.Y
 page1.Parent = pages
 
 local page3 = Instance.new("Frame")
@@ -1200,59 +1319,120 @@ local flyToggle = makeToggle(page1, 148, "飞行", function(state)
     setFly(state)
 end)
 
--- ===== 踏空行走：每帧只抹掉"往下掉"的速度，往上跳不受影响 =====
+-- ===== 踏空行走：用 AlignPosition 锁住高度，比每帧抹速度更硬 =====
 local walkAirOn = false
 local walkAirConn = nil
+local walkAtt = nil
+local walkAlign = nil
+local walkLockY = nil     -- 锁定的高度：只许往上抬，不许往下掉
+
+local function teardownWalkAir()
+    if walkAirConn then walkAirConn:Disconnect(); walkAirConn = nil end
+    if walkAlign then pcall(function() walkAlign:Destroy() end); walkAlign = nil end
+    if walkAtt then pcall(function() walkAtt:Destroy() end); walkAtt = nil end
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true) end) end
+    walkLockY = nil
+end
+
+local setWalkAirRef = nil   -- 重生重建时要用
 
 setWalkAir = function(on, quiet)
+    teardownWalkAir()
     walkAirOn = on and true or false
-    if walkAirConn then walkAirConn:Disconnect(); walkAirConn = nil end
+
     if walkAirOn then
         if flying and setFly then setFly(false) end   -- 飞行先关，不然两边抢高度
-        walkAirConn = RunService.Heartbeat:Connect(function()
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            if not root then return end
-            if flying then return end
-            local v = root.AssemblyLinearVelocity
-            if v.Y < 0 then
-                root.AssemblyLinearVelocity = Vector3.new(v.X, 0, v.Z)
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+        if root then
+            walkLockY = root.Position.Y
+            walkAtt = Instance.new("Attachment")
+            walkAtt.Name = "WalkAirAtt"
+            walkAtt.Parent = root
+
+            walkAlign = Instance.new("AlignPosition")
+            walkAlign.Name = "WalkAirAlign"
+            walkAlign.Mode = Enum.PositionAlignmentMode.OneAttachment
+            walkAlign.Attachment0 = walkAtt
+            walkAlign.MaxForce = 200000
+            walkAlign.Responsiveness = 60
+            walkAlign.ApplyAtCenterOfMass = true
+            walkAlign.Position = root.Position
+            walkAlign.Parent = walkAtt
+        end
+
+        -- 关掉"自由落体"状态：脚下没东西也能算站在地上，这样还能跳
+        if hum then
+            pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false) end)
+        end
+
+        walkAirConn = RunService.Stepped:Connect(function()
+            if flying or not walkAirOn then return end
+            local c = player.Character
+            local r = c and c:FindFirstChild("HumanoidRootPart")
+            local h = c and c:FindFirstChildOfClass("Humanoid")
+            if not r then return end
+
+            -- 重生换了角色，约束跟着旧模型没了，重新建一套
+            if not walkAlign or not walkAlign.Parent then
+                if setWalkAirRef then setWalkAirRef(true, true) end
+                return
+            end
+
+            -- 往上跳就跟着抬（可以升高），往下不给降
+            local v = r.AssemblyLinearVelocity
+            local y = walkLockY or r.Position.Y
+            if v.Y > 1 and r.Position.Y > y then y = r.Position.Y end
+            walkLockY = y
+
+            walkAlign.Position = Vector3.new(r.Position.X, y, r.Position.Z)
+
+            if h and h:GetState() == Enum.HumanoidStateType.Freefall then
+                pcall(function() h:ChangeState(Enum.HumanoidStateType.Running) end)
             end
         end)
     end
+
     if walkAirToggle then walkAirToggle.Set(walkAirOn, true) end
     if not quiet then
-        say(walkAirOn and "踏空行走已开启（空中也能往前走）" or "踏空行走已关闭", walkAirOn or nil)
+        say(walkAirOn and "踏空行走已开启（空中也能往前走，还能跳）" or "踏空行走已关闭", walkAirOn or nil)
     end
 end
+
+setWalkAirRef = setWalkAir
 
 -- ===== 点按钮弹出的小窗（里面就一个踏空行走开关） =====
 local walkAirPanel = nil
 
 local function buildWalkAirPanel()
-    local mask = Instance.new("TextButton")
-    mask.Name = "WalkAirMask"
-    mask.Size = UDim2.fromScale(1, 1)
-    mask.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    mask.BackgroundTransparency = 0.45
-    mask.BorderSizePixel = 0
-    mask.AutoButtonColor = false
-    mask.Text = ""
-    mask.ZIndex = 20
-    mask.Visible = false
-    mask.Parent = win
-
+    -- 独立小窗：不挂遮罩，直接浮在主窗外面，随便拖
     local panel = Instance.new("TextButton")
+    panel.Name = "WalkAirPanel"
     panel.Size = UDim2.fromOffset(210, 104)
-    panel.Position = UDim2.fromScale(0.5, 0.5)
+    local gsz = gui.AbsoluteSize
+    local cam = workspace.CurrentCamera
+    local vp = (cam and cam.ViewportSize) or Vector2.new(390, 720)
+    local cw = (gsz.X > 100) and gsz.X or vp.X
+    local ch = (gsz.Y > 100) and gsz.Y or (vp.Y - 36)
+    panel.Position = UDim2.fromOffset(math.max(4, cw - 120), math.max(4, ch - 96))
     panel.AnchorPoint = Vector2.new(0.5, 0.5)
     panel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
     panel.BorderSizePixel = 0
     panel.AutoButtonColor = false
     panel.Text = ""
     panel.ZIndex = 21
-    panel.Parent = mask
+    panel.Visible = false
+    panel.Parent = gui
     corner(panel, 8)
+
+    local stroke2 = Instance.new("UIStroke")
+    stroke2.Color = Color3.fromRGB(62, 62, 68)
+    stroke2.Thickness = 1
+    stroke2.Parent = panel
 
     local t = Instance.new("TextLabel")
     t.Size = UDim2.new(1, -50, 0, 26)
@@ -1279,13 +1459,59 @@ local function buildWalkAirPanel()
     xBtn.ZIndex = 24
     xBtn.Parent = panel
 
+    -- 标题那一横条可以拖着走，范围限制在主窗口里面
+    local dragBar = Instance.new("TextButton")
+    dragBar.Size = UDim2.new(1, -44, 0, 26)
+    dragBar.Position = UDim2.fromOffset(0, 0)
+    dragBar.BackgroundTransparency = 1
+    dragBar.BorderSizePixel = 0
+    dragBar.AutoButtonColor = false
+    dragBar.Text = ""
+    dragBar.ZIndex = 23
+    dragBar.Parent = panel
+
+    local pDrag = false
+    local pDragFrom = nil
+    local pCenterFrom = nil
+
+    dragBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            pDrag = true
+            pDragFrom = input.Position
+            local ap, as = panel.AbsolutePosition, panel.AbsoluteSize
+            pCenterFrom = Vector2.new(ap.X + as.X / 2, ap.Y + as.Y / 2)
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(input)
+        if not pDrag then return end
+        local t = input.UserInputType
+        if t ~= Enum.UserInputType.MouseMovement and t ~= Enum.UserInputType.Touch then return end
+
+        local d = input.Position - pDragFrom
+        local cx, cy = pCenterFrom.X + d.X, pCenterFrom.Y + d.Y
+        local halfW, halfH = panel.AbsoluteSize.X / 2, panel.AbsoluteSize.Y / 2
+        local gp, gs = gui.AbsolutePosition, gui.AbsoluteSize
+        cx = math.clamp(cx, gp.X + halfW, math.max(gp.X + halfW, gp.X + gs.X - halfW))
+        cy = math.clamp(cy, gp.Y + halfH, math.max(gp.Y + halfH, gp.Y + gs.Y - halfH))
+        panel.Position = UDim2.fromOffset(cx - halfW - gp.X, cy - halfH - gp.Y)
+    end)
+
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            pDrag = false
+        end
+    end)
+
     walkAirToggle = makeToggleAt(panel, 14, 36, 182, "开启踏空行走", function(state)
         setWalkAir(state)
     end)
 
     -- 关窗就把踏空行走一起关掉，下次打开是干净的关闭状态
     local function closePanel()
-        mask.Visible = false
+        panel.Visible = false
         setWalkAir(false, true)
         if walkAirToggle then walkAirToggle.Set(false, true) end
     end
@@ -1293,13 +1519,13 @@ local function buildWalkAirPanel()
     -- 只有右上角那个 × 能关，点遮罩空白不关
     xBtn.MouseButton1Click:Connect(closePanel)
 
-    walkAirPanel = mask
+    walkAirPanel = panel
 end
 
 buildWalkAirPanel()
 
 -- 第 1 页底部那个按钮：点了就把小窗调出来
-makeButton(page1, 240, "踏空行走", function()
+makeButton(page1, 254, "踏空行走", function()
     if walkAirPanel then
         setWalkAir(false, true)                    -- 打开永远是关闭态
         if walkAirToggle then walkAirToggle.Set(false, true) end
