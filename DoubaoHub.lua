@@ -366,7 +366,8 @@ makeCategory("修改角色属性", 1, 1)
 makeCategory("方块尺寸", 2, 2)
 makeCategory("高亮 ESP", 3, 3)
 makeCategory("空4", 4, 4)
-for i = 5, 9 do
+makeCategory("瞬移点", 5, 5)
+for i = 6, 9 do
     makeCategory("空" .. i, i, i)
 end
 
@@ -1531,6 +1532,26 @@ local function hpColor(hp, maxhp)
     if hp ~= hp or hp == math.huge or hp == -math.huge then
         return Color3.fromRGB(205, 210, 225)
     end
+    -- 血量 10000 及以上：亮白
+    if hp >= 10000 then
+        return Color3.fromRGB(255, 255, 255)
+    end
+    -- 血量 1000 及以上：金橙
+    if hp >= 1000 then
+        return Color3.fromRGB(255, 165, 40)
+    end
+    -- 血量 500 及以上：玫红
+    if hp >= 500 then
+        return Color3.fromRGB(255, 100, 180)
+    end
+    -- 血量 200 及以上：紫
+    if hp >= 200 then
+        return Color3.fromRGB(185, 120, 255)
+    end
+    -- 血量 150 及以上：青
+    if hp >= 150 then
+        return Color3.fromRGB(80, 200, 255)
+    end
     -- 血量掉到一半以下：黄
     if maxhp and maxhp == maxhp and maxhp > 0 and hp < maxhp * 0.5 then
         return Color3.fromRGB(255, 222, 80)
@@ -1855,27 +1876,8 @@ local function espRender()
                 end
                 if m == myChar then col = Color3.fromRGB(150, 220, 255) end
 
-                -- 血量不设上限（无限 / NaN / 上限为 0）的一律当怪物，不标"人"
-                local infHp = false
-                if hum then
-                    local maxHp = hum.MaxHealth
-                    if maxHp == math.huge or maxHp ~= maxHp or hum.Health ~= hum.Health or maxHp <= 0 then
-                        infHp = true
-                    end
-                end
-
-                -- 只有真的属于玩家、且血量正常的角色才标"人"
-                local kind = nil
-                if rec.player and not infHp and isPlayerRig(m, hum) then
-                    if hum and hum.Health <= 0 then
-                        kind = "尸体"
-                    else
-                        kind = "人"
-                    end
-                end
-                local head = nm
-                if kind then head = nm .. "（" .. kind .. "）" end
-                lb.Text = head .. "\n" .. hpStr .. "\n" .. tostring(math.floor(dxz)) .. " studs"
+                -- 名字后面不再标"人 / 尸体"，只留纯名字
+                lb.Text = nm .. "\n" .. hpStr .. "\n" .. tostring(math.floor(dxz)) .. " studs"
                 lb.TextColor3 = col
                 lb.TextTransparency = edge and 0.3 or 0
                 lb.TextSize = (dxz > 700) and 10 or 12
@@ -2118,6 +2120,434 @@ RunService.Heartbeat:Connect(function()
     pcall(espRender)
 end)
 
+-- ===== 第 5 页：瞬移点（记录 / 选中 / 重命名 / 删除 / 按坐标瞬移） =====
+local tpPage = emptyPages[1]
+local tpPoints = {}
+local tpSelected = nil
+local tpList = nil
+local rebuildTpList = nil
+local tpRebuilding = false
+local tpPendingEdit = nil
+local updateTpSel = nil
+local tpSelName = nil
+local tpBoxX, tpBoxY, tpBoxZ = nil, nil, nil
+
+local function fmtCoord(p)
+    return math.floor(p.X) .. ", " .. math.floor(p.Y) .. ", " .. math.floor(p.Z)
+end
+
+local function doTeleport(pos, labelText)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then
+        say("角色还没加载好", false)
+        return
+    end
+    root.CFrame = CFrame.new(pos)
+    say("已瞬移" .. (labelText and ("：" .. labelText) or ""), true)
+end
+
+makeButton(tpPage, 12, "记录当前位置为瞬移点", function()
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then
+        say("角色还没加载好", false)
+        return
+    end
+    tpPoints[#tpPoints + 1] = { name = "点" .. (#tpPoints + 1), pos = root.Position }
+    tpPendingEdit = #tpPoints
+    tpSelected = #tpPoints
+    if rebuildTpList then rebuildTpList() end
+    if updateTpSel then updateTpSel() end
+    say("已添加瞬移点，给它起个名字（不填就用 点" .. #tpPoints .. "）", true)
+end)
+
+-- 选中条：显示选中那条的名字和坐标，右边一个"瞬移"
+local tpSelBar = Instance.new("Frame")
+tpSelBar.Position = UDim2.fromOffset(14, 56)
+tpSelBar.Size = UDim2.fromOffset(303, 34)
+tpSelBar.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+tpSelBar.BorderSizePixel = 0
+tpSelBar.Parent = tpPage
+corner(tpSelBar, 6)
+
+tpSelName = Instance.new("TextLabel")
+tpSelName.Position = UDim2.fromOffset(10, 0)
+tpSelName.Size = UDim2.new(1, -84, 1, 0)
+tpSelName.BackgroundTransparency = 1
+tpSelName.Text = "未选择瞬移点（点列表里的一条）"
+tpSelName.Font = Enum.Font.SourceSansBold
+tpSelName.TextSize = 10
+tpSelName.TextColor3 = Color3.fromRGB(160, 160, 160)
+tpSelName.TextXAlignment = Enum.TextXAlignment.Left
+tpSelName.TextTruncate = Enum.TextTruncate.AtEnd
+tpSelName.Parent = tpSelBar
+
+local tpGoBtn = Instance.new("TextButton")
+tpGoBtn.Position = UDim2.new(1, -70, 0, 0)
+tpGoBtn.Size = UDim2.fromOffset(70, 34)
+tpGoBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
+tpGoBtn.BorderSizePixel = 0
+tpGoBtn.AutoButtonColor = false
+tpGoBtn.Text = "瞬移"
+tpGoBtn.Font = Enum.Font.SourceSansBold
+tpGoBtn.TextSize = 12
+tpGoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpGoBtn.Parent = tpSelBar
+corner(tpGoBtn, 6)
+
+tpGoBtn.MouseButton1Click:Connect(function()
+    if not tpSelected or not tpPoints[tpSelected] then
+        say("先在列表里点一条瞬移点", false)
+        return
+    end
+    doTeleport(tpPoints[tpSelected].pos, tpPoints[tpSelected].name)
+end)
+
+-- XYZ 三个独立输入框 + 按坐标瞬移
+local function makeXyzBox(x, ph)
+    local b = Instance.new("TextBox")
+    b.Position = UDim2.fromOffset(x, 96)
+    b.Size = UDim2.fromOffset(58, 34)
+    b.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+    b.BorderSizePixel = 0
+    b.Font = Enum.Font.SourceSans
+    b.TextSize = 12
+    b.Text = ""
+    b.PlaceholderText = ph
+    b.PlaceholderColor3 = Color3.fromRGB(130, 130, 130)
+    b.TextColor3 = Color3.fromRGB(235, 235, 235)
+    b.TextXAlignment = Enum.TextXAlignment.Center
+    b.ClearTextOnFocus = false
+    b.Parent = tpPage
+    corner(b, 6)
+    return b
+end
+
+tpBoxX = makeXyzBox(14, "X")
+tpBoxY = makeXyzBox(76, "Y")
+tpBoxZ = makeXyzBox(138, "Z")
+
+local tpXyzGo = Instance.new("TextButton")
+tpXyzGo.Position = UDim2.fromOffset(198, 96)
+tpXyzGo.Size = UDim2.fromOffset(54, 34)
+tpXyzGo.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
+tpXyzGo.BorderSizePixel = 0
+tpXyzGo.AutoButtonColor = false
+tpXyzGo.Text = "按坐标瞬移"
+tpXyzGo.Font = Enum.Font.SourceSansBold
+tpXyzGo.TextSize = 9
+tpXyzGo.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpXyzGo.Parent = tpPage
+corner(tpXyzGo, 6)
+
+tpXyzGo.MouseButton1Click:Connect(function()
+    local x = tonumber(tpBoxX.Text)
+    local y = tonumber(tpBoxY.Text)
+    local z = tonumber(tpBoxZ.Text)
+    -- 哪个没填就按 0 算；三个都空才拦一下，免得直接飞原点
+    if not x and not y and not z then
+        say("X / Y / Z 至少要填一个", false)
+        return
+    end
+    x = x or 0
+    y = y or 0
+    z = z or 0
+    say("瞬移到 " .. x .. ", " .. y .. ", " .. z, true)
+    doTeleport(Vector3.new(x, y, z), nil)
+end)
+
+-- 预览：在目标坐标放一个可见的标记点，屏幕标签一直显示距离（隔多远都看得见）
+local previewPart = nil
+local previewScreen = nil
+local previewTag = nil
+
+local previewBtn = Instance.new("TextButton")
+previewBtn.Position = UDim2.fromOffset(254, 96)
+previewBtn.Size = UDim2.fromOffset(49, 34)
+previewBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+previewBtn.BorderSizePixel = 0
+previewBtn.AutoButtonColor = false
+previewBtn.Text = "预览"
+previewBtn.Font = Enum.Font.SourceSansBold
+previewBtn.TextSize = 10
+previewBtn.TextColor3 = Color3.fromRGB(225, 225, 225)
+previewBtn.Parent = tpPage
+corner(previewBtn, 6)
+
+previewScreen = Instance.new("ScreenGui")
+previewScreen.Name = "TpPreviewTag"
+previewScreen.IgnoreGuiInset = true
+previewScreen.ResetOnSpawn = false
+previewScreen.DisplayOrder = 6
+previewScreen.Enabled = false
+previewScreen.Parent = playerGui
+
+previewTag = Instance.new("TextLabel")
+previewTag.Size = UDim2.fromOffset(150, 22)
+previewTag.AnchorPoint = Vector2.new(0.5, 0.5)
+previewTag.BackgroundTransparency = 1
+previewTag.Text = ""
+previewTag.Font = Enum.Font.SourceSansBold
+previewTag.TextSize = 12
+previewTag.TextColor3 = Color3.fromRGB(120, 220, 255)
+previewTag.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+previewTag.TextStrokeTransparency = 0.3
+previewTag.Visible = false
+previewTag.Parent = previewScreen
+
+endPreview = function()
+    if previewPart then
+        pcall(function() previewPart:Destroy() end)
+        previewPart = nil
+    end
+    if previewTag then previewTag.Visible = false end
+    if previewScreen then previewScreen.Enabled = false end
+    if previewBtn then previewBtn.Text = "预览" end
+end
+
+local function startPreview(pos)
+    endPreview()
+
+    local marker = Instance.new("Part")
+    marker.Name = "TpPreviewMarker"
+    marker.Shape = Enum.PartType.Ball
+    marker.Size = Vector3.new(1.4, 1.4, 1.4)
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.CanQuery = false
+    marker.CanTouch = false
+    marker.Material = Enum.Material.Neon
+    marker.Color = Color3.fromRGB(80, 200, 255)
+    marker.Position = pos
+    marker.Parent = workspace
+    previewPart = marker
+
+    previewScreen.Enabled = true
+    previewBtn.Text = "清除"
+end
+
+previewBtn.MouseButton1Click:Connect(function()
+    if previewPart and previewPart.Parent then
+        endPreview()
+        say("已清除预览点", nil)
+        return
+    end
+    local x = tonumber(tpBoxX.Text)
+    local y = tonumber(tpBoxY.Text)
+    local z = tonumber(tpBoxZ.Text)
+    if not x and not y and not z then
+        say("X / Y / Z 至少要填一个", false)
+        return
+    end
+    x = x or 0
+    y = y or 0
+    z = z or 0
+    startPreview(Vector3.new(x, y, z))
+    say("预览点已放在 " .. x .. ", " .. y .. ", " .. z, true)
+end)
+
+-- 标签每帧跟着标记点走，超出屏幕就贴到边上
+RunService.Heartbeat:Connect(function()
+    if not previewPart or not previewPart.Parent then
+        if previewTag and previewTag.Visible then previewTag.Visible = false end
+        return
+    end
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local vp = cam.ViewportSize
+    local myPos = modelWorldPos(player.Character)
+    local sp = cam:WorldToViewportPoint(previewPart.Position)
+    local dist = (previewPart.Position - myPos).Magnitude
+
+    local x, y = sp.X, sp.Y
+    if sp.Z <= 0 then
+        x, y = vp.X * 0.5, vp.Y - 30
+    else
+        local padX, padY = 64, 26
+        if x < padX then x = padX elseif x > vp.X - padX then x = vp.X - padX end
+        if y < padY then y = padY elseif y > vp.Y - padY then y = vp.Y - padY end
+    end
+
+    previewTag.Position = UDim2.fromOffset(math.floor(x), math.floor(y))
+    previewTag.Text = "预览点 " .. math.floor(dist) .. " 格"
+    previewTag.Visible = true
+end)
+
+-- 列表
+tpList = Instance.new("ScrollingFrame")
+tpList.Position = UDim2.fromOffset(14, 136)
+tpList.Size = UDim2.new(1, -28, 1, -160)
+tpList.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
+tpList.BorderSizePixel = 0
+tpList.ScrollBarThickness = 4
+tpList.ScrollBarImageColor3 = Color3.fromRGB(90, 90, 90)
+tpList.CanvasSize = UDim2.new(0, 0, 0, 0)
+pcall(function() tpList.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
+tpList.Parent = tpPage
+corner(tpList, 6)
+
+local tpLayout = Instance.new("UIListLayout")
+tpLayout.Padding = UDim.new(0, 1)
+tpLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tpLayout.Parent = tpList
+
+updateTpSel = function()
+    local it = tpSelected and tpPoints[tpSelected]
+    if it then
+        tpSelName.Text = tpSelected .. ". " .. it.name .. "   " .. fmtCoord(it.pos)
+        tpSelName.TextColor3 = Color3.fromRGB(150, 220, 255)
+        if tpBoxX then tpBoxX.Text = tostring(math.floor(it.pos.X)) end
+        if tpBoxY then tpBoxY.Text = tostring(math.floor(it.pos.Y)) end
+        if tpBoxZ then tpBoxZ.Text = tostring(math.floor(it.pos.Z)) end
+    else
+        tpSelName.Text = "未选择瞬移点（点列表里的一条）"
+        tpSelName.TextColor3 = Color3.fromRGB(160, 160, 160)
+    end
+end
+
+rebuildTpList = function()
+    tpRebuilding = true
+    for _, c in ipairs(tpList:GetChildren()) do
+        if c ~= tpLayout then c:Destroy() end
+    end
+
+    if #tpPoints == 0 then
+        local empty = Instance.new("TextLabel")
+        empty.Size = UDim2.new(1, 0, 0, 34)
+        empty.BackgroundTransparency = 1
+        empty.Text = "还没有瞬移点，点上面按钮记录一个"
+        empty.Font = Enum.Font.SourceSans
+        empty.TextSize = 11
+        empty.TextColor3 = Color3.fromRGB(110, 110, 110)
+        empty.Parent = tpList
+        tpRebuilding = false
+        return
+    end
+
+    for i, item in ipairs(tpPoints) do
+        local row = Instance.new("Frame")
+        row.Size = UDim2.new(1, 0, 0, 34)
+        row.BackgroundTransparency = 1
+        row.LayoutOrder = i
+        row.Parent = tpList
+
+        local nameBtn = Instance.new("TextButton")
+        nameBtn.Position = UDim2.fromOffset(0, 0)
+        nameBtn.Size = UDim2.fromOffset(84, 34)
+        nameBtn.BackgroundColor3 = (tpSelected == i) and Color3.fromRGB(30, 70, 140) or Color3.fromRGB(24, 24, 24)
+        nameBtn.BorderSizePixel = 0
+        nameBtn.AutoButtonColor = false
+        nameBtn.Text = i .. ". " .. item.name
+        nameBtn.Font = Enum.Font.SourceSansBold
+        nameBtn.TextSize = 10
+        nameBtn.TextColor3 = (tpSelected == i) and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(200, 200, 200)
+        nameBtn.TextXAlignment = Enum.TextXAlignment.Left
+        nameBtn.TextTruncate = Enum.TextTruncate.AtEnd
+        nameBtn.Parent = row
+        corner(nameBtn, 6)
+        local np = Instance.new("UIPadding", nameBtn)
+        np.PaddingLeft = UDim.new(0, 8)
+
+        local edit = Instance.new("TextBox")
+        edit.Position = UDim2.fromOffset(0, 0)
+        edit.Size = UDim2.fromOffset(84, 34)
+        edit.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+        edit.BorderSizePixel = 0
+        edit.Font = Enum.Font.SourceSansBold
+        edit.TextSize = 10
+        edit.TextColor3 = Color3.fromRGB(235, 235, 235)
+        edit.TextXAlignment = Enum.TextXAlignment.Left
+        edit.Text = item.name
+        edit.ClearTextOnFocus = false
+        edit.Visible = false
+        edit.ZIndex = 3
+        edit.Parent = row
+        corner(edit, 6)
+        local ep = Instance.new("UIPadding", edit)
+        ep.PaddingLeft = UDim.new(0, 8)
+
+        local coordLb = Instance.new("TextLabel")
+        coordLb.Position = UDim2.fromOffset(86, 0)
+        coordLb.Size = UDim2.fromOffset(62, 34)
+        coordLb.BackgroundTransparency = 1
+        coordLb.Text = fmtCoord(item.pos)
+        coordLb.Font = Enum.Font.SourceSans
+        coordLb.TextSize = 8
+        coordLb.TextColor3 = Color3.fromRGB(130, 130, 130)
+        coordLb.TextXAlignment = Enum.TextXAlignment.Left
+        coordLb.TextTruncate = Enum.TextTruncate.AtEnd
+        coordLb.Parent = row
+
+        local jumpBtn = Instance.new("TextButton")
+        jumpBtn.Position = UDim2.fromOffset(150, 0)
+        jumpBtn.Size = UDim2.fromOffset(44, 34)
+        jumpBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
+        jumpBtn.BorderSizePixel = 0
+        jumpBtn.AutoButtonColor = false
+        jumpBtn.Text = "瞬移"
+        jumpBtn.Font = Enum.Font.SourceSansBold
+        jumpBtn.TextSize = 10
+        jumpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        jumpBtn.ZIndex = 2
+        jumpBtn.Parent = row
+        corner(jumpBtn, 6)
+        jumpBtn.MouseButton1Click:Connect(function()
+            doTeleport(item.pos, item.name)
+        end)
+
+        edit.FocusLost:Connect(function()
+            if tpRebuilding then return end
+            local txt = edit.Text
+            if txt == nil or txt == "" then txt = "点" .. i end
+            item.name = string.sub(txt, 1, 20)
+            rebuildTpList()
+            updateTpSel()
+        end)
+
+        nameBtn.MouseButton1Click:Connect(function()
+            tpSelected = i
+            updateTpSel()
+            rebuildTpList()
+        end)
+
+        if tpPendingEdit == i then
+            tpPendingEdit = nil
+            edit.Text = item.name
+            edit.Visible = true
+            nameBtn.Visible = false
+            task.defer(function()
+                if edit.Parent then
+                    pcall(function() edit:CaptureFocus() end)
+                end
+            end)
+        end
+
+        local renameBtn = makeFlatButton(row, 196, 0, 52, 34, "重命名", function()
+            edit.Text = item.name
+            edit.Visible = true
+            nameBtn.Visible = false
+            edit:CaptureFocus()
+        end)
+
+        local delBtn = makeFlatButton(row, 250, 0, 40, 34, "删除", function()
+            table.remove(tpPoints, i)
+            if tpSelected == i then
+                tpSelected = nil
+            elseif tpSelected and tpSelected > i then
+                tpSelected = tpSelected - 1
+            end
+            rebuildTpList()
+            updateTpSel()
+            say("已删除 " .. item.name, true)
+        end)
+    end
+    tpRebuilding = false
+end
+
+rebuildTpList()
+updateTpSel()
+
 
 setPicking = function(mode, quiet)
     picking = mode
@@ -2265,6 +2695,9 @@ Cleanup.run = function()
     end)
     pcall(function()
         if noclipOn and setNoclip then setNoclip(false) end
+    end)
+    pcall(function()
+        if endPreview then endPreview() end
     end)
     pcall(function()
         local hum = getHumanoid()
