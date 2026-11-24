@@ -165,6 +165,7 @@ mini.MouseLeave:Connect(function()
 end)
 
 local minimized = false
+local fullPos = nil   -- 最小化前的位置，展开时原样回去
 local FULL_SIZE = UDim2.fromOffset(460, 330)
 local MINI_SIZE = UDim2.fromOffset(128, 32)
 
@@ -178,10 +179,12 @@ local function tweenTo(obj, goal)
     local tw = TweenService:Create(obj, T_MINI, goal)
     minTweens[obj] = tw
     tw:Play()
+    return tw
 end
 
 local function applyMinimize()
     if minimized then
+        fullPos = win.Position
         title.TextXAlignment = Enum.TextXAlignment.Right
         title.TextSize = 13
         close.Visible = false
@@ -198,9 +201,14 @@ local function applyMinimize()
         title.TextSize = 15
         close.Visible = true
         mini.TextSize = 16
+        local backPos = fullPos or UDim2.new(
+            win.Position.X.Scale, win.Position.X.Offset,
+            win.Position.Y.Scale, win.Position.Y.Offset + 149
+        )
+        fullPos = nil
         tweenTo(win, {
             Size = FULL_SIZE,
-            Position = UDim2.new(win.Position.X.Scale, win.Position.X.Offset, win.Position.Y.Scale, win.Position.Y.Offset + 149),
+            Position = backPos,
         })
         tweenTo(titleBar, { Size = UDim2.new(1, -2, 0, 42) })
         tweenTo(title, { Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -105, 1, 0) })
@@ -208,17 +216,17 @@ local function applyMinimize()
     end
 end
 
-local miniLast = 0
+-- 动画期间直接忽略点击：中途反转状态会让尺寸和位置都错乱
+local miniBusy = false
 local function toggleMini()
-    local now = os.clock()
-    if now - miniLast < 0.55 then return end
-    miniLast = now
+    if miniBusy then return end
+    miniBusy = true
     minimized = not minimized
     applyMinimize()
+    task.delay(0.52, function() miniBusy = false end)
 end
 
 mini.MouseButton1Click:Connect(toggleMini)
-pcall(function() mini.Activated:Connect(toggleMini) end)
 
 -- 不管是点 ×、脚本删 gui、还是别的原因没了，都复位一次
 pcall(function()
@@ -2132,6 +2140,103 @@ local updateTpSel = nil
 local tpSelName = nil
 local tpBoxX, tpBoxY, tpBoxZ = nil, nil, nil
 
+-- 瞬移点存盘：优先写文件（执行器环境，跨局有效），同时挂一份在 playerGui 里
+-- 官方 Studio 的 LocalScript 没有文件权限，这时至少同一局重开脚本还能读回来
+local TP_FILE = "豆包中心_瞬移点.txt"
+local TP_STORE = "DbaoCenterStore"
+local tpSaveWarned = false
+
+local function tpFileReady()
+    return type(writefile) == "function" and type(readfile) == "function"
+end
+
+local function tpPack()
+    local lines = {}
+    for i, it in ipairs(tpPoints) do
+        lines[i] = (it.name:gsub("%s+", " ")) .. "\t" ..
+            string.format("%.3f\t%.3f\t%.3f", it.pos.X, it.pos.Y, it.pos.Z)
+    end
+    return table.concat(lines, "\n")
+end
+
+local function tpStoreValue(make)
+    local ok, v = pcall(function()
+        local f = playerGui:FindFirstChild(TP_STORE)
+        if not f and make then
+            f = Instance.new("Folder")
+            f.Name = TP_STORE
+            f.Parent = playerGui
+        end
+        if not f then return nil end
+        local sv = f:FindFirstChild("TPoints")
+        if not sv and make then
+            sv = Instance.new("StringValue")
+            sv.Name = "TPoints"
+            sv.Parent = f
+        end
+        return sv
+    end)
+    if ok then return v end
+    return nil
+end
+
+local function tpSave(silent)
+    local body = tpPack()
+    pcall(function()
+        local sv = tpStoreValue(true)
+        if sv then sv.Value = body end
+    end)
+    if not tpFileReady() then
+        if not tpSaveWarned and not silent then
+            tpSaveWarned = true
+            say("这个环境不能写文件，换局会丢（同一局重开脚本还在）", false)
+        end
+        return false
+    end
+    local ok = pcall(function() writefile(TP_FILE, body) end)
+    if not ok then
+        if not silent then say("写文件失败，这次没存上", false) end
+        return false
+    end
+    return true
+end
+
+local function tpParse(raw)
+    if type(raw) ~= "string" or #raw == 0 then return 0 end
+    local n = 0
+    for line in raw:gmatch("[^\r\n]+") do
+        local name, x, y, z = line:match("^(.-)\t(%-?[%d%.]+)\t(%-?[%d%.]+)\t(%-?[%d%.]+)")
+        if name and tonumber(x) and tonumber(y) and tonumber(z) then
+            n = n + 1
+            tpPoints[n] = {
+                name = (name ~= "" and name or ("点" .. n)),
+                pos = Vector3.new(tonumber(x), tonumber(y), tonumber(z)),
+            }
+        end
+    end
+    return n
+end
+
+local function tpLoad()
+    local raw = nil
+    if type(readfile) == "function" then
+        pcall(function()
+            if type(isfile) == "function" and not isfile(TP_FILE) then return end
+            raw = readfile(TP_FILE)
+        end)
+    end
+    if type(raw) ~= "string" or #raw == 0 then
+        pcall(function()
+            local sv = tpStoreValue(false)
+            if sv then raw = sv.Value end
+        end)
+    end
+    tpParse(raw)
+end
+
+tpLoad()
+
+
 local function fmtCoord(p)
     return math.floor(p.X) .. ", " .. math.floor(p.Y) .. ", " .. math.floor(p.Z)
 end
@@ -2147,7 +2252,7 @@ local function doTeleport(pos, labelText)
     say("已瞬移" .. (labelText and ("：" .. labelText) or ""), true)
 end
 
-makeButton(tpPage, 12, "记录当前位置为瞬移点", function()
+local tpRecBtn = makeFlatButton(tpPage, 14, 12, 196, 40, "记录当前位置", function()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then
@@ -2157,6 +2262,7 @@ makeButton(tpPage, 12, "记录当前位置为瞬移点", function()
     tpPoints[#tpPoints + 1] = { name = "点" .. (#tpPoints + 1), pos = root.Position }
     tpPendingEdit = #tpPoints
     tpSelected = #tpPoints
+    if tpSave then tpSave() end
     if rebuildTpList then rebuildTpList() end
     if updateTpSel then updateTpSel() end
     say("已添加瞬移点，给它起个名字（不填就用 点" .. #tpPoints .. "）", true)
@@ -2230,13 +2336,13 @@ tpBoxZ = makeXyzBox(138, "Z")
 
 local tpXyzGo = Instance.new("TextButton")
 tpXyzGo.Position = UDim2.fromOffset(198, 96)
-tpXyzGo.Size = UDim2.fromOffset(54, 34)
+tpXyzGo.Size = UDim2.fromOffset(105, 34)
 tpXyzGo.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
 tpXyzGo.BorderSizePixel = 0
 tpXyzGo.AutoButtonColor = false
 tpXyzGo.Text = "按坐标瞬移"
 tpXyzGo.Font = Enum.Font.SourceSansBold
-tpXyzGo.TextSize = 9
+tpXyzGo.TextSize = 11
 tpXyzGo.TextColor3 = Color3.fromRGB(255, 255, 255)
 tpXyzGo.Parent = tpPage
 corner(tpXyzGo, 6)
@@ -2263,14 +2369,14 @@ local previewScreen = nil
 local previewTag = nil
 
 local previewBtn = Instance.new("TextButton")
-previewBtn.Position = UDim2.fromOffset(254, 96)
-previewBtn.Size = UDim2.fromOffset(49, 34)
+previewBtn.Position = UDim2.fromOffset(214, 12)
+previewBtn.Size = UDim2.fromOffset(103, 40)
 previewBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
 previewBtn.BorderSizePixel = 0
 previewBtn.AutoButtonColor = false
 previewBtn.Text = "预览"
 previewBtn.Font = Enum.Font.SourceSansBold
-previewBtn.TextSize = 10
+previewBtn.TextSize = 11
 previewBtn.TextColor3 = Color3.fromRGB(225, 225, 225)
 previewBtn.Parent = tpPage
 corner(previewBtn, 6)
@@ -2501,6 +2607,7 @@ rebuildTpList = function()
             local txt = edit.Text
             if txt == nil or txt == "" then txt = "点" .. i end
             item.name = string.sub(txt, 1, 20)
+            if tpSave then tpSave(true) end
             rebuildTpList()
             updateTpSel()
         end)
@@ -2537,6 +2644,7 @@ rebuildTpList = function()
             elseif tpSelected and tpSelected > i then
                 tpSelected = tpSelected - 1
             end
+            if tpSave then tpSave(true) end
             rebuildTpList()
             updateTpSel()
             say("已删除 " .. item.name, true)
@@ -2594,51 +2702,105 @@ UIS.InputBegan:Connect(function(input)
 end)
 setPage(1)
 
--- ===== 拖动：标题栏按下即跟手，全屏跟随，按位移增量累加 =====
+-- ===== 拖动：标题栏按下即跟手 =====
+-- 用"指针绝对位置 + 按下时的抓取偏移"定位，不再累加每帧增量，所以不会漂、不会甩
 local dragging = false
 local dragInput = nil
-local dragTouch = nil
-local lastPos = nil
-local DRAG_MAX_DELTA = 150   -- 单帧异常跳变忽略
+local dragGrab = Vector2.new(0, 0)
+local gsvc = game:GetService("GuiService")
 
--- 把位置统一成纯 Offset：Scale 参与累加会漂
+local function guiInsetY()
+    local ok, ins = pcall(function() return gsvc:GetGuiInset() end)
+    if ok and typeof(ins) == "Vector2" then return ins.Y end
+    return 36
+end
+
+-- input.Position 是屏幕坐标，GUI 坐标要减掉顶部那条 inset，两边才对得上
+local function ptrGui(input)
+    local p = input.Position
+    return Vector2.new(p.X, p.Y - guiInsetY())
+end
+
+-- 把 Position 统一成纯 Offset：Scale 参与后会跟着视口变，拖起来就飘
 local function normalizePos()
-    local ap = win.AbsolutePosition
-    local as = win.AbsoluteSize
+    local ap, as = win.AbsolutePosition, win.AbsoluteSize
     win.Position = UDim2.fromOffset(
         ap.X + as.X * win.AnchorPoint.X,
         ap.Y + as.Y * win.AnchorPoint.Y
     )
 end
 
+local function dragLimits()
+    local vp = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
+    local as = win.AbsoluteSize
+    local ax, ay = win.AnchorPoint.X, win.AnchorPoint.Y
+    local minX, minY = as.X * ax, as.Y * ay
+    local maxX = math.max(minX, vp.X - as.X * (1 - ax))
+    local maxY = math.max(minY, vp.Y - guiInsetY() - as.Y * (1 - ay))
+    return minX, maxX, minY, maxY
+end
+
+-- 点最小化 / 关闭这种小按钮时不要顺手开始拖，否则点一下窗口位置也动了
+local function onTitleButton(input)
+    local ok, objs = pcall(function()
+        return UIS:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
+    end)
+    if not ok or type(objs) ~= "table" then return false end
+    for _, o in ipairs(objs) do
+        if o == mini or o == close or o:IsDescendantOf(mini) or o:IsDescendantOf(close) then
+            return true
+        end
+    end
+    return false
+end
+
 local function beginDrag(input)
     if dragging then return end
-    -- 最小化/展开动画还在跑就先全部停掉，不然拖着会跟补间打架
+    if onTitleButton(input) then return end
+    -- 最小化/展开动画还在跑就先停掉，不然拖着会跟补间打架
     for obj in pairs(minTweens) do
         pcall(function() minTweens[obj]:Cancel() end)
     end
     minTweens = {}
+    -- 开场那段 0.86→1 的展开动画没跑完就拖，UIScale 会让尺寸一直在变，位置就乱跳
+    pcall(function() winScale.Scale = 1 end)
+    if minimized then fullPos = nil end
     dragging = true
     dragInput = input
-    dragTouch = (input.UserInputType == Enum.UserInputType.Touch) and input or nil
-    lastPos = input.Position
     normalizePos()
+    local gp = ptrGui(input)
+    local ap = win.AbsolutePosition
+    dragGrab = Vector2.new(ap.X - gp.X, ap.Y - gp.Y)
 end
 
 local function endDrag()
     dragging = false
     dragInput = nil
-    dragTouch = nil
-    lastPos = nil
+    -- 拖动时把尺寸动画掐断过，尺寸可能卡在半截。松手后补一次，回到该有的大小
+    local as = win.AbsoluteSize
+    if minimized then
+        if math.abs(as.X - 128) > 2 or math.abs(as.Y - 32) > 2 then
+            tweenTo(win, { Size = MINI_SIZE })
+            tweenTo(titleBar, { Size = UDim2.new(1, -2, 0, 32) })
+        end
+    else
+        if math.abs(as.X - 460) > 2 or math.abs(as.Y - 330) > 2 then
+            tweenTo(win, { Size = FULL_SIZE })
+            tweenTo(titleBar, { Size = UDim2.new(1, -2, 0, 42) })
+        end
+    end
 end
 
-local function moveDrag(dx, dy)
-    local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+local function moveDrag(input)
+    local minX, maxX, minY, maxY = dragLimits()
     local as = win.AbsoluteSize
     local ax, ay = win.AnchorPoint.X, win.AnchorPoint.Y
-    local x = math.clamp(win.Position.X.Offset + dx, as.X * ax, math.max(as.X * ax, vp.X - as.X * (1 - ax)))
-    local y = math.clamp(win.Position.Y.Offset + dy, as.Y * ay, math.max(as.Y * ay, vp.Y - as.Y * (1 - ay)))
-    win.Position = UDim2.fromOffset(x, y)
+    local gp = ptrGui(input)
+    local refX = gp.X + dragGrab.X + as.X * ax
+    local refY = gp.Y + dragGrab.Y + as.Y * ay
+    refX = math.clamp(refX, minX, maxX)
+    refY = math.clamp(refY, minY, maxY)
+    win.Position = UDim2.fromOffset(math.floor(refX), math.floor(refY))
 end
 
 titleBar.InputBegan:Connect(function(input)
@@ -2650,25 +2812,15 @@ end)
 
 UIS.InputChanged:Connect(function(input)
     if not dragging then return end
-
     local t = input.UserInputType
     if t == Enum.UserInputType.Touch then
-        if input ~= dragTouch then return end
+        if input ~= dragInput then return end
     elseif t == Enum.UserInputType.MouseMovement then
         if not dragInput or dragInput.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
     else
         return
     end
-
-    local d = input.Delta
-    if d.Magnitude <= 0 then
-        if not lastPos then return end
-        d = input.Position - lastPos
-    end
-    lastPos = input.Position
-    if d.Magnitude <= 0 or d.Magnitude > DRAG_MAX_DELTA then return end
-
-    moveDrag(d.X, d.Y)
+    moveDrag(input)
 end)
 
 UIS.InputEnded:Connect(function(input)
@@ -2676,7 +2828,7 @@ UIS.InputEnded:Connect(function(input)
     local t = input.UserInputType
     if t == Enum.UserInputType.MouseButton1 then
         endDrag()
-    elseif t == Enum.UserInputType.Touch and input == dragTouch then
+    elseif t == Enum.UserInputType.Touch and input == dragInput then
         endDrag()
     end
 end)
@@ -2698,6 +2850,9 @@ Cleanup.run = function()
     end)
     pcall(function()
         if endPreview then endPreview() end
+    end)
+    pcall(function()
+        if tpSave then tpSave(true) end
     end)
     pcall(function()
         local hum = getHumanoid()
