@@ -1471,7 +1471,12 @@ local function hpColor(hp, maxhp)
     if hp ~= hp or hp == math.huge or hp == -math.huge then
         return Color3.fromRGB(205, 210, 225)
     end
-    return Color3.fromRGB(255, 255, 255)
+    -- 血量掉到一半以下：黄
+    if maxhp and maxhp == maxhp and maxhp > 0 and hp < maxhp * 0.5 then
+        return Color3.fromRGB(255, 222, 80)
+    end
+    -- 一半以上到满血：绿
+    return Color3.fromRGB(110, 240, 130)
 end
 
 -- 是不是“人形/怪物”模型：Humanoid 或有骨骼动画控制器，或带 Head 的 PrimaryPart 模型
@@ -1766,15 +1771,24 @@ local function espRender()
                 if hum then
                     if hum.DisplayName and hum.DisplayName ~= "" then nm = hum.DisplayName end
                     hpStr = fmtNum(hum.Health) .. " / " .. fmtNum(hum.MaxHealth)
-                    col = hpColor(hum.Health, hum.MaxHealth)
+                    -- 血量不设上限的东西（怪物）用琥珀色单独标出来，别跟玩家混在一起
+                    local maxHp = hum.MaxHealth
+                    if maxHp == math.huge or maxHp ~= maxHp or hum.Health ~= hum.Health then
+                        col = Color3.fromRGB(255, 176, 64)
+                    else
+                        col = hpColor(hum.Health, hum.MaxHealth)
+                    end
                 end
                 if m == myChar then col = Color3.fromRGB(150, 220, 255) end
 
+                -- 只有真的属于玩家的角色才标"人"，怪物/NPC 就算有 Humanoid 也不冒充人
                 local kind = nil
-                if hum and hum.Health <= 0 then
-                    kind = "尸体"
-                elseif hum then
-                    kind = "人"
+                if rec.player then
+                    if hum and hum.Health <= 0 then
+                        kind = "尸体"
+                    else
+                        kind = "人"
+                    end
                 end
                 local head = nm
                 if kind then head = nm .. "（" .. kind .. "）" end
