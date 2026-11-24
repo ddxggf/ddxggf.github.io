@@ -1736,6 +1736,20 @@ local function espScan()
     end
 end
 
+-- 是不是标准玩家骨架（R6 / R15 + 人形根部 + 头）。
+-- 有名字有血量的怪物也可能是 Humanoid，但极少同时满足这三条，
+-- 用它挡住"把怪物练成玩家角色"的误判
+local function isPlayerRig(m, hum)
+    if not m or not hum then return false end
+    local ok, rt = pcall(function() return hum.RigType end)
+    if not ok or not rt then return false end
+    if rt ~= Enum.HumanoidRigType.R6 and rt ~= Enum.HumanoidRigType.R15 then return false end
+    if not m:FindFirstChild("HumanoidRootPart") then return false end
+    local head = m:FindFirstChild("Head")
+    if not (head and head:IsA("BasePart")) then return false end
+    return true
+end
+
 local function espRender()
     local cam = workspace.CurrentCamera
     if not cam then return end
@@ -1781,9 +1795,18 @@ local function espRender()
                 end
                 if m == myChar then col = Color3.fromRGB(150, 220, 255) end
 
-                -- 只有真的属于玩家的角色才标"人"，怪物/NPC 就算有 Humanoid 也不冒充人
+                -- 血量不设上限（无限 / NaN / 上限为 0）的一律当怪物，不标"人"
+                local infHp = false
+                if hum then
+                    local maxHp = hum.MaxHealth
+                    if maxHp == math.huge or maxHp ~= maxHp or hum.Health ~= hum.Health or maxHp <= 0 then
+                        infHp = true
+                    end
+                end
+
+                -- 只有真的属于玩家、且血量正常的角色才标"人"
                 local kind = nil
-                if rec.player then
+                if rec.player and not infHp and isPlayerRig(m, hum) then
                     if hum and hum.Health <= 0 then
                         kind = "尸体"
                     else
