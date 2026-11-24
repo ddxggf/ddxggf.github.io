@@ -222,13 +222,13 @@ pcall(function()
         end)
     end)
 
-    -- ⑥ 4.35 停半拍，卡片放大淡出，同时叫主窗登场
+    -- ⑥ 4.35 停半拍，卡片放大淡出；开场层彻底销毁后才叫主窗登场
     task.delay(4.35, function()
-        fireSplashDone()
         T:Create(card, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { GroupTransparency = 1 }):Play()
         T:Create(cardScale, TweenInfo.new(0.45, Enum.EasingStyle.Quad, OUTQ), { Scale = 1.05 }):Play()
         task.delay(0.55, function()
             pcall(function() sg:Destroy() end)
+            fireSplashDone()
         end)
     end)
 end)
@@ -290,7 +290,7 @@ if SplashState.active then
     onSplashDone(function()
         win.Visible = true
         TweenService:Create(winScale,
-            TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+            TweenInfo.new(0.68, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
             { Scale = 1 }):Play()
     end)
     -- 兜底：开场要是没正常收尾，几秒后也把窗口放出来，绝不留黑屏无窗口
@@ -1742,6 +1742,52 @@ local function espClear()
     espHl = {}
 end
 
+-- ESP 方框用的包围盒：只统计离躯干 6 格以内的部件。
+-- 角色死亡后四肢会甩出去很远，旧办法 GetBoundingBox 会把它们全框进来，
+-- 框就被撑得又长又斜；限定距离后死没死都是正常大小。
+local function espBoxOf(m)
+    local hum = m:FindFirstChildOfClass("Humanoid")
+    local root = (hum and hum.RootPart) or m:FindFirstChild("HumanoidRootPart")
+    if not root or not root:IsA("BasePart") then
+        local ok, cf, size = pcall(function() return m:GetBoundingBox() end)
+        if ok and cf and size then return cf, size end
+        return nil
+    end
+
+    local rp = root.Position
+    local mnX, mnY, mnZ = math.huge, math.huge, math.huge
+    local mxX, mxY, mxZ = -math.huge, -math.huge, -math.huge
+    local found = false
+
+    local function addPart(p)
+        if not p or not p:IsA("BasePart") then return end
+        if (p.Position - rp).Magnitude > 6 then return end
+        local hs = p.Size * 0.5
+        if p.Position.X - hs.X < mnX then mnX = p.Position.X - hs.X end
+        if p.Position.Y - hs.Y < mnY then mnY = p.Position.Y - hs.Y end
+        if p.Position.Z - hs.Z < mnZ then mnZ = p.Position.Z - hs.Z end
+        if p.Position.X + hs.X > mxX then mxX = p.Position.X + hs.X end
+        if p.Position.Y + hs.Y > mxY then mxY = p.Position.Y + hs.Y end
+        if p.Position.Z + hs.Z > mxZ then mxZ = p.Position.Z + hs.Z end
+        found = true
+    end
+
+    addPart(root)
+    for _, c in ipairs(m:GetChildren()) do
+        addPart(c)
+    end
+
+    if not found then return nil end
+
+    local cx = (mnX + mxX) * 0.5
+    local cy = (mnY + mxY) * 0.5
+    local cz = (mnZ + mxZ) * 0.5
+    local sx = mxX - mnX + 0.5
+    local sy = mxY - mnY + 0.35
+    local sz = mxZ - mnZ + 0.5
+    return CFrame.new(cx, cy, cz), Vector3.new(sx, sy, sz)
+end
+
 local function espScan()
     local chars = collectChars()
     local alive = {}
@@ -1784,9 +1830,9 @@ local function espScan()
             local rec = { label = lb, box = bx, stroke = bs, player = owner }
 
             -- 包围盒记一次（0.3 秒刷新），之后每帧用 pivot 跟着走
-            local okB, bcf, bsize = pcall(function() return m:GetBoundingBox() end)
             local okP, pcf = pcall(function() return m:GetPivot() end)
-            if okB and bcf and bsize and okP and pcf then
+            local bcf, bsize = espBoxOf(m)
+            if bcf and bsize and okP and pcf then
                 rec.size = bsize
                 rec.localCF = pcf:ToObjectSpace(bcf)
             end
@@ -1818,9 +1864,9 @@ local function espScan()
 
     -- 每轮重算包围盒：怪物走动、骨骼动画变形时，2D 框能跟着走而不是钉在原地
     for m, rec in pairs(espTargets) do
-        local okB, bcf, bsize = pcall(function() return m:GetBoundingBox() end)
         local okP, pcf = pcall(function() return m:GetPivot() end)
-        if okB and bcf and bsize and okP and pcf then
+        local bcf, bsize = espBoxOf(m)
+        if bcf and bsize and okP and pcf then
             rec.size = bsize
             rec.localCF = pcf:ToObjectSpace(bcf)
         else
@@ -1919,7 +1965,15 @@ local function espRender()
                 end
                 if m == myChar then col = Color3.fromRGB(150, 220, 255) end
 
-                lb.Text = nm .. "\n" .. hpStr .. "\n" .. tostring(math.floor(dxz)) .. " studs"
+                local kind = nil
+                if hum and hum.Health <= 0 then
+                    kind = "尸体"
+                elseif hum then
+                    kind = "人"
+                end
+                local head = nm
+                if kind then head = nm .. "（" .. kind .. "）" end
+                lb.Text = head .. "\n" .. hpStr .. "\n" .. tostring(math.floor(dxz)) .. " studs"
                 lb.TextColor3 = col
                 lb.TextTransparency = edge and 0.3 or 0
                 lb.TextSize = (dxz > 700) and 10 or 12
