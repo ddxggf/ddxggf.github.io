@@ -1136,9 +1136,14 @@ local function removeWalkPad()
 end
 
 local function footYOf(char)
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
+    -- 优先量真实包围盒底（最准），量不到或者散架了就退回公式
+    local ok, cf, size = pcall(function() return char:GetBoundingBox() end)
+    if ok and cf and size and math.abs((cf.Position.Y - size.Y * 0.5) - root.Position.Y) < 7 then
+        return cf.Position.Y - size.Y * 0.5
+    end
+    local hum = char:FindFirstChildOfClass("Humanoid")
     local hip = (hum and hum.HipHeight) or 2
     return root.Position.Y - (root.Size.Y * 0.5 + hip)
 end
@@ -1147,7 +1152,7 @@ local function createWalkPad(y)
     removeWalkPad()
     local pad = Instance.new("Part")
     pad.Name = "WalkAirPad"
-    pad.Size = Vector3.new(5, 2, 5)
+    pad.Size = Vector3.new(5, 4, 5)
     pad.Anchored = true
     pad.CanCollide = true
     pad.CanTouch = false
@@ -1172,10 +1177,26 @@ setWalkAir = function(on, quiet)
         local char = player.Character
         local fy = footYOf(char)
         if fy then
-            createWalkPad(fy - 1.2)
+            createWalkPad(fy - 2.35)
         end
 
-        local walkBelow = 0
+        -- 开启时如果正在高速下坠：用 10 个真实帧把垂直速度刹到 0，别让一帧就穿过板
+        local brakeLeft = 0
+        local brakeStep = 0
+        do
+            local r0 = char and char:FindFirstChild("HumanoidRootPart")
+            local vy0 = r0 and r0.AssemblyLinearVelocity.Y or 0
+            if vy0 < -6 then
+                brakeLeft = 1
+                brakeStep = math.abs(vy0)
+                -- 按下的这一刻就先刹一次，不等心跳
+                local vv0 = r0.AssemblyLinearVelocity
+                r0.AssemblyLinearVelocity = Vector3.new(vv0.X, 0, vv0.Z)
+            end
+        end
+
+        local walkWasUp = false
+        local walkSettle = 0
         walkAirConn = RunService.Heartbeat:Connect(function(dt)
             if flying or not walkAirOn then return end
             local c = player.Character
@@ -1186,36 +1207,59 @@ setWalkAir = function(on, quiet)
             if not walkPad or not walkPad.Parent then
                 local fy2 = footYOf(c)
                 if not fy2 then return end
-                createWalkPad(fy2 - 1.2)
+                createWalkPad(fy2 - 2.35)
             end
 
-            -- 直接拿"脚底在哪"来定板，不用加速度判断
             local fy = footYOf(c)
-            if fy and walkPadY then
-                local target = fy - 1.2
-                if target > walkPadY + 0.1 then
-                    -- 脚到了更高的一层（跳上去 / 走上高处）：板直接定在这一层
+            if not fy or not walkPadY then return end
+
+            local v = r.AssemblyLinearVelocity
+            local target = fy - 2.35
+
+            -- 记下"这一跳正在往上走"
+            if v.Y > 2 then
+                walkWasUp = true
+                walkSettle = 0
+            end
+
+            if walkWasUp and v.Y <= 0 then
+                -- 到顶了：只垫这一次，而且必须真跳上去 1.5 格以上才垫
+                walkWasUp = false
+                if target > walkPadY + 1.5 then
                     walkPadY = target
-                    walkBelow = 0
-                elseif target < walkPadY - 1 then
-                    -- 人比板低一大截：只有真的站稳在更低的地面才降，掉下来途中不跟
-                    local hum = c:FindFirstChildOfClass("Humanoid")
-                    local st = hum and hum:GetState()
-                    if st == Enum.HumanoidStateType.Landed or st == Enum.HumanoidStateType.Running then
-                        walkBelow = walkBelow + (dt or 0)
-                        if walkBelow > 0.3 then
-                            walkPadY = target
-                            walkBelow = 0
-                        end
-                    else
-                        walkBelow = 0
-                    end
-                else
-                    walkBelow = 0
                 end
             end
 
-            -- X/Z 每一帧跟人，Y 按上面算好的那一层
+            -- 比板低一截：站稳在更低的地面才降，掉落途中绝不跟
+            if target < walkPadY - 1.5 then
+                local hum = c:FindFirstChildOfClass("Humanoid")
+                local st = hum and hum:GetState()
+                if st == Enum.HumanoidStateType.Landed or st == Enum.HumanoidStateType.Running then
+                    walkSettle = walkSettle + (dt or 0)
+                    if walkSettle > 0.35 then
+                        walkPadY = target
+                        walkSettle = 0
+                    end
+                else
+                    walkSettle = 0
+                end
+            else
+                walkSettle = 0
+            end
+
+            -- 下坠刹车：每帧抬 1/10 的原始速度，10 帧内归零（已经落到板上就不动它）
+            if brakeLeft > 0 then
+                brakeLeft = brakeLeft - 1
+                local vv = r.AssemblyLinearVelocity
+                if vv.Y < 0 then
+                    local ny = math.min(0, vv.Y + brakeStep)
+                    r.AssemblyLinearVelocity = Vector3.new(vv.X, ny, vv.Z)
+                else
+                    brakeLeft = 0
+                end
+            end
+
+            -- 只有 X/Z 每帧跟人；Y 全程钉死，只在"到顶"那一下换一次
             walkPad.Position = Vector3.new(r.Position.X, walkPadY, r.Position.Z)
             -- 碰撞常开：人在板下方才关，免得撞头
             walkPad.CanCollide = (r.Position.Y >= walkPadY)
@@ -1234,7 +1278,7 @@ player.CharacterAdded:Connect(function(char)
     task.delay(0.35, function()
         if not walkAirOn then return end
         local fy = footYOf(char)
-        if fy then createWalkPad(fy - 1.2) end
+        if fy then createWalkPad(fy - 2.35) end
     end)
 end)
 
