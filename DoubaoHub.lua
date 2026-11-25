@@ -1,4 +1,5 @@
 --[[
+  by doubao
   窗口（460×330）+ 四页侧边栏
     1 修改角色属性：改速度 / 改跳跃力 / 穿墙 / 飞行
        穿墙=每帧（Stepped）把自己角色所有 BasePart 的 CanCollide 设成 false
@@ -373,9 +374,8 @@ end
 makeCategory("修改角色属性", 1, 1)
 makeCategory("方块尺寸", 2, 2)
 makeCategory("高亮 ESP", 3, 3)
-makeCategory("空4", 4, 4)
-makeCategory("瞬移点", 5, 5)
-for i = 6, 9 do
+makeCategory("瞬移点", 4, 4)
+for i = 5, 9 do
     makeCategory("空" .. i, i, i)
 end
 
@@ -1701,10 +1701,12 @@ local function espScan()
                 lb.Name = "ESP_Tag"
                 lb.BackgroundTransparency = 1
                 lb.AnchorPoint = Vector2.new(0.5, 0.5)
-                lb.Size = UDim2.fromOffset(190, 58)
+                lb.Size = UDim2.fromOffset(400, 18)
                 lb.Font = Enum.Font.SourceSansBold
                 lb.TextSize = 12
-                lb.TextWrapped = true
+                lb.TextWrapped = false
+                lb.TextXAlignment = Enum.TextXAlignment.Center
+                lb.TextYAlignment = Enum.TextYAlignment.Center
                 lb.TextColor3 = Color3.fromRGB(255, 255, 255)
                 lb.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
                 lb.TextStrokeTransparency = 0.35
@@ -1865,7 +1867,8 @@ local function espRender()
                 elseif y > vp.Y - padY then y = vp.Y - padY; edge = true end
 
                 lb.Visible = true
-                lb.Position = UDim2.fromOffset(math.floor(x), math.floor(y))
+                -- 横排一行，整行往上抬 14 格像素，别压在头顶
+                lb.Position = UDim2.fromOffset(math.floor(x), math.floor(math.max(8, y - 14)))
 
                 local dxz = Vector2.new(wp.X - myPos.X, wp.Z - myPos.Z).Magnitude
                 local nm = m.Name
@@ -1885,7 +1888,7 @@ local function espRender()
                 if m == myChar then col = Color3.fromRGB(150, 220, 255) end
 
                 -- 名字后面不再标"人 / 尸体"，只留纯名字
-                lb.Text = nm .. "\n" .. hpStr .. "\n" .. tostring(math.floor(dxz)) .. " studs"
+                lb.Text = nm .. "  " .. hpStr .. "  " .. tostring(math.floor(dxz)) .. " studs"
                 lb.TextColor3 = col
                 lb.TextTransparency = edge and 0.3 or 0
                 lb.TextSize = (dxz > 700) and 10 or 12
@@ -2026,7 +2029,7 @@ local dropLayout = nil
 local rebuildMuteList = nil
 local muteToggleBtn = nil
 
-local function makeFlatButton(parent, x, y, w, h, text, onClick)
+local function makeFlatButton(parent, x, y, w, h, text, onClick, textSize)
     local btn = Instance.new("TextButton")
     btn.Position = UDim2.fromOffset(x, y)
     btn.Size = UDim2.fromOffset(w, h)
@@ -2035,7 +2038,7 @@ local function makeFlatButton(parent, x, y, w, h, text, onClick)
     btn.AutoButtonColor = false
     btn.Text = text
     btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 11
+    btn.TextSize = textSize or 11
     btn.TextColor3 = Color3.fromRGB(225, 225, 225)
     btn.TextTruncate = Enum.TextTruncate.AtEnd
     btn.ZIndex = 2
@@ -2129,7 +2132,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ===== 第 5 页：瞬移点（记录 / 选中 / 重命名 / 删除 / 按坐标瞬移） =====
-local tpPage = emptyPages[1]
+local tpPage = emptyPages[1]   -- 侧边栏第 4 项"瞬移点"，对应 pagesList[4]
 local tpPoints = {}
 local tpSelected = nil
 local tpList = nil
@@ -2139,6 +2142,8 @@ local tpPendingEdit = nil
 local updateTpSel = nil
 local tpSelName = nil
 local tpBoxX, tpBoxY, tpBoxZ = nil, nil, nil
+local openNamePanel = nil
+local tpNamingIndex = nil
 
 -- 瞬移点存盘：优先写文件（执行器环境，跨局有效），同时挂一份在 playerGui 里
 -- 官方 Studio 的 LocalScript 没有文件权限，这时至少同一局重开脚本还能读回来
@@ -2260,13 +2265,13 @@ local tpRecBtn = makeFlatButton(tpPage, 14, 12, 196, 40, "记录当前位置", f
         return
     end
     tpPoints[#tpPoints + 1] = { name = "点" .. (#tpPoints + 1), pos = root.Position }
-    tpPendingEdit = #tpPoints
     tpSelected = #tpPoints
     if tpSave then tpSave() end
     if rebuildTpList then rebuildTpList() end
     if updateTpSel then updateTpSel() end
-    say("已添加瞬移点，给它起个名字（不填就用 点" .. #tpPoints .. "）", true)
-end)
+    if openNamePanel then openNamePanel(#tpPoints) end
+    say("已添加第 " .. #tpPoints .. " 个瞬移点", true)
+end, 12)
 
 -- 选中条：显示选中那条的名字和坐标，右边一个"瞬移"
 local tpSelBar = Instance.new("Frame")
@@ -2283,7 +2288,7 @@ tpSelName.Size = UDim2.new(1, -84, 1, 0)
 tpSelName.BackgroundTransparency = 1
 tpSelName.Text = "未选择瞬移点（点列表里的一条）"
 tpSelName.Font = Enum.Font.SourceSansBold
-tpSelName.TextSize = 10
+tpSelName.TextSize = 12
 tpSelName.TextColor3 = Color3.fromRGB(160, 160, 160)
 tpSelName.TextXAlignment = Enum.TextXAlignment.Left
 tpSelName.TextTruncate = Enum.TextTruncate.AtEnd
@@ -2376,7 +2381,7 @@ previewBtn.BorderSizePixel = 0
 previewBtn.AutoButtonColor = false
 previewBtn.Text = "预览"
 previewBtn.Font = Enum.Font.SourceSansBold
-previewBtn.TextSize = 11
+previewBtn.TextSize = 12
 previewBtn.TextColor3 = Color3.fromRGB(225, 225, 225)
 previewBtn.Parent = tpPage
 corner(previewBtn, 6)
@@ -2390,12 +2395,12 @@ previewScreen.Enabled = false
 previewScreen.Parent = playerGui
 
 previewTag = Instance.new("TextLabel")
-previewTag.Size = UDim2.fromOffset(150, 22)
+previewTag.Size = UDim2.fromOffset(180, 26)
 previewTag.AnchorPoint = Vector2.new(0.5, 0.5)
 previewTag.BackgroundTransparency = 1
 previewTag.Text = ""
 previewTag.Font = Enum.Font.SourceSansBold
-previewTag.TextSize = 12
+previewTag.TextSize = 13
 previewTag.TextColor3 = Color3.fromRGB(120, 220, 255)
 previewTag.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 previewTag.TextStrokeTransparency = 0.3
@@ -2418,7 +2423,7 @@ local function startPreview(pos)
     local marker = Instance.new("Part")
     marker.Name = "TpPreviewMarker"
     marker.Shape = Enum.PartType.Ball
-    marker.Size = Vector3.new(1.4, 1.4, 1.4)
+    marker.Size = Vector3.new(3, 3, 3)
     marker.Anchored = true
     marker.CanCollide = false
     marker.CanQuery = false
@@ -2483,7 +2488,7 @@ end)
 -- 列表
 tpList = Instance.new("ScrollingFrame")
 tpList.Position = UDim2.fromOffset(14, 136)
-tpList.Size = UDim2.new(1, -28, 1, -160)
+tpList.Size = UDim2.new(1, -28, 1, -150)
 tpList.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
 tpList.BorderSizePixel = 0
 tpList.ScrollBarThickness = 4
@@ -2520,11 +2525,11 @@ rebuildTpList = function()
 
     if #tpPoints == 0 then
         local empty = Instance.new("TextLabel")
-        empty.Size = UDim2.new(1, 0, 0, 34)
+        empty.Size = UDim2.new(1, 0, 0, 42)
         empty.BackgroundTransparency = 1
         empty.Text = "还没有瞬移点，点上面按钮记录一个"
         empty.Font = Enum.Font.SourceSans
-        empty.TextSize = 11
+        empty.TextSize = 12
         empty.TextColor3 = Color3.fromRGB(110, 110, 110)
         empty.Parent = tpList
         tpRebuilding = false
@@ -2533,20 +2538,20 @@ rebuildTpList = function()
 
     for i, item in ipairs(tpPoints) do
         local row = Instance.new("Frame")
-        row.Size = UDim2.new(1, 0, 0, 34)
+        row.Size = UDim2.new(1, 0, 0, 42)
         row.BackgroundTransparency = 1
         row.LayoutOrder = i
         row.Parent = tpList
 
         local nameBtn = Instance.new("TextButton")
         nameBtn.Position = UDim2.fromOffset(0, 0)
-        nameBtn.Size = UDim2.fromOffset(84, 34)
+        nameBtn.Size = UDim2.fromOffset(76, 42)
         nameBtn.BackgroundColor3 = (tpSelected == i) and Color3.fromRGB(30, 70, 140) or Color3.fromRGB(24, 24, 24)
         nameBtn.BorderSizePixel = 0
         nameBtn.AutoButtonColor = false
         nameBtn.Text = i .. ". " .. item.name
         nameBtn.Font = Enum.Font.SourceSansBold
-        nameBtn.TextSize = 10
+        nameBtn.TextSize = 12
         nameBtn.TextColor3 = (tpSelected == i) and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(200, 200, 200)
         nameBtn.TextXAlignment = Enum.TextXAlignment.Left
         nameBtn.TextTruncate = Enum.TextTruncate.AtEnd
@@ -2557,11 +2562,11 @@ rebuildTpList = function()
 
         local edit = Instance.new("TextBox")
         edit.Position = UDim2.fromOffset(0, 0)
-        edit.Size = UDim2.fromOffset(84, 34)
+        edit.Size = UDim2.fromOffset(76, 42)
         edit.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
         edit.BorderSizePixel = 0
         edit.Font = Enum.Font.SourceSansBold
-        edit.TextSize = 10
+        edit.TextSize = 12
         edit.TextColor3 = Color3.fromRGB(235, 235, 235)
         edit.TextXAlignment = Enum.TextXAlignment.Left
         edit.Text = item.name
@@ -2574,26 +2579,26 @@ rebuildTpList = function()
         ep.PaddingLeft = UDim.new(0, 8)
 
         local coordLb = Instance.new("TextLabel")
-        coordLb.Position = UDim2.fromOffset(86, 0)
-        coordLb.Size = UDim2.fromOffset(62, 34)
+        coordLb.Position = UDim2.fromOffset(78, 0)
+        coordLb.Size = UDim2.fromOffset(74, 42)
         coordLb.BackgroundTransparency = 1
         coordLb.Text = fmtCoord(item.pos)
         coordLb.Font = Enum.Font.SourceSans
-        coordLb.TextSize = 8
+        coordLb.TextSize = 10
         coordLb.TextColor3 = Color3.fromRGB(130, 130, 130)
         coordLb.TextXAlignment = Enum.TextXAlignment.Left
         coordLb.TextTruncate = Enum.TextTruncate.AtEnd
         coordLb.Parent = row
 
         local jumpBtn = Instance.new("TextButton")
-        jumpBtn.Position = UDim2.fromOffset(150, 0)
-        jumpBtn.Size = UDim2.fromOffset(44, 34)
+        jumpBtn.Position = UDim2.fromOffset(154, 0)
+        jumpBtn.Size = UDim2.fromOffset(47, 42)
         jumpBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 255)
         jumpBtn.BorderSizePixel = 0
         jumpBtn.AutoButtonColor = false
         jumpBtn.Text = "瞬移"
         jumpBtn.Font = Enum.Font.SourceSansBold
-        jumpBtn.TextSize = 10
+        jumpBtn.TextSize = 12
         jumpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         jumpBtn.ZIndex = 2
         jumpBtn.Parent = row
@@ -2630,14 +2635,14 @@ rebuildTpList = function()
             end)
         end
 
-        local renameBtn = makeFlatButton(row, 196, 0, 52, 34, "重命名", function()
+        local renameBtn = makeFlatButton(row, 203, 0, 50, 42, "重命名", function()
             edit.Text = item.name
             edit.Visible = true
             nameBtn.Visible = false
             edit:CaptureFocus()
         end)
 
-        local delBtn = makeFlatButton(row, 250, 0, 40, 34, "删除", function()
+        local delBtn = makeFlatButton(row, 255, 0, 43, 42, "删除", function()
             table.remove(tpPoints, i)
             if tpSelected == i then
                 tpSelected = nil
@@ -2652,6 +2657,99 @@ rebuildTpList = function()
     end
     tpRebuilding = false
 end
+
+-- ===== 命名弹窗：新建点后居中弹出来，标题写清楚"给它起个名字" =====
+-- 包成立即执行函数，避免主 chunk 的局部变量数量超过 200 上限
+openNamePanel = (function()
+    local panel = Instance.new("Frame")
+    panel.Size = UDim2.fromOffset(303, 158)
+    panel.Position = UDim2.new(0.5, 0, 0.5, 0)
+    panel.AnchorPoint = Vector2.new(0.5, 0.5)
+    panel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+    panel.BorderSizePixel = 0
+    panel.Visible = false
+    panel.ZIndex = 8
+    panel.Parent = tpPage
+    corner(panel, 10)
+
+    local st = Instance.new("UIStroke")
+    st.Color = Color3.fromRGB(80, 140, 210)
+    st.Thickness = 1
+    st.Parent = panel
+
+    local tt = Instance.new("TextLabel")
+    tt.Size = UDim2.new(1, -28, 0, 26)
+    tt.Position = UDim2.fromOffset(14, 10)
+    tt.BackgroundTransparency = 1
+    tt.Text = "给这个瞬移点起个名字"
+    tt.Font = Enum.Font.SourceSansBold
+    tt.TextSize = 14
+    tt.TextColor3 = Color3.fromRGB(150, 220, 255)
+    tt.TextXAlignment = Enum.TextXAlignment.Left
+    tt.ZIndex = 9
+    tt.Parent = panel
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(1, -28, 0, 42)
+    box.Position = UDim2.fromOffset(14, 42)
+    box.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    box.BorderSizePixel = 0
+    box.Font = Enum.Font.SourceSansBold
+    box.TextSize = 15
+    box.TextColor3 = Color3.fromRGB(240, 240, 240)
+    box.TextXAlignment = Enum.TextXAlignment.Left
+    box.ClearTextOnFocus = false
+    box.PlaceholderText = "不填就用默认名"
+    box.PlaceholderColor3 = Color3.fromRGB(130, 130, 130)
+    box.ZIndex = 9
+    box.Parent = panel
+    corner(box, 8)
+    local bp = Instance.new("UIPadding", box)
+    bp.PaddingLeft = UDim.new(0, 10)
+
+    local function closePanel()
+        panel.Visible = false
+        tpNamingIndex = nil
+    end
+
+    local function applyName(useDefault)
+        local idx = tpNamingIndex
+        if not idx then closePanel() return end
+        local it = tpPoints[idx]
+        if it then
+            local txt = box.Text or ""
+            txt = txt:gsub("^%s+", ""):gsub("%s+$", "")
+            if useDefault or txt == "" then txt = "点" .. idx end
+            it.name = string.sub(txt, 1, 20)
+        end
+        if tpSave then tpSave(true) end
+        closePanel()
+        rebuildTpList()
+        updateTpSel()
+        say("名字已保存", true)
+    end
+
+    makeFlatButton(panel, 14, 98, 132, 46, "确定", function()
+        applyName(false)
+    end, 14).ZIndex = 9
+
+    makeFlatButton(panel, 157, 98, 132, 46, "用默认名", function()
+        applyName(true)
+    end, 13).ZIndex = 9
+
+    return function(idx)
+        local it = tpPoints[idx]
+        if not it then return end
+        tpNamingIndex = idx
+        box.Text = it.name
+        panel.Visible = true
+        task.defer(function()
+            if box.Parent then
+                pcall(function() box:CaptureFocus() end)
+            end
+        end)
+    end
+end)()
 
 rebuildTpList()
 updateTpSel()
